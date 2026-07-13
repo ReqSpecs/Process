@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+/*
+  ProDraw design tokens
+  "Notion warmth + subtle Porsche GT1 livery accents"
+  Locked from the Higgsfield brand board (assets/higgsfield-brand-board-v1.png):
+  paper #f7f6f3 · warm grey #efeeea · ink #1d1c1a · cobalt #1e40af · orange #f97316 · gold #b45309
+*/
+
+@theme {
+  --color-paper: #f7f6f3;
+  --color-surface: #ffffff;
+  --color-mist: #efeeea;
+  --color-hairline: #e6e4df;
+  --color-ink: #1d1c1a;
+  --color-ink-soft: #55524c;
+  --color-ink-faint: #8a867e;
+
+  --color-cobalt: #1e40af;
+  --color-cobalt-deep: #16308a;
+  --color-cobalt-tint: #dbe3f8;
+  --color-cobalt-wash: #eef1fb;
+
+  --color-ember: #f97316;
+  --color-ember-tint: #ffedd5;
+
+  --color-signal: #c81f1f;
+
+  --color-gold: #b45309;
+  --color-gold-tint: #f6ecd9;
+
+  /* Vibrant accents mirroring the animated headline pill / mockup palette */
+  --color-violet: #7c3aed;
+  --color-violet-tint: #efe7fe;
+  --color-teal: #0f9e7a;
+  --color-teal-tint: #dcf3ec;
+  --color-magenta: #e81e62;
+  --color-magenta-tint: #fde3ec;
+  --color-lime: #7a9e00;
+  --color-lime-tint: #eef7cf;
+
+  --font-sans: var(--font-geist-sans), "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), "Geist Mono", ui-monospace, monospace;
+  --font-display: var(--font-inter), "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  --radius-card: 16px;
+  --radius-panel: 24px;
+
+  --shadow-soft: 0 1px 2px rgb(29 28 26 / 0.04), 0 8px 24px rgb(29 28 26 / 0.06);
+  --shadow-float: 0 2px 4px rgb(29 28 26 / 0.05), 0 20px 60px rgb(29 28 26 / 0.10);
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html {
+  scroll-behavior: smooth;
+  /* Scroll anchoring would bump scrollY when the brand strip expands
+     (content grows mid-page), making it appear to jump upward. */
+  overflow-anchor: none;
+}
+
+body {
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--color-cobalt-tint);
+  color: var(--color-ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

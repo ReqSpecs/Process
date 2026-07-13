@@ -1,0 +1,154 @@
+/*
+  ProDraw theme for bpmn-js chrome.
+  Restyles the palette, context pad, selection, and popup menus so the
+  editor feels native to the warm paper palette instead of stock bpmn.io.
+*/
+
+/* ---------- canvas ---------- */
+.bjs-container {
+  background-color: var(--color-paper);
+  background-image: radial-gradient(
+    circle,
+    var(--color-hairline) 1px,
+    transparent 1px
+  );
+  background-size: 20px 20px;
+}
+
+/* hide bpmn.io watermark link styling conflicts; keep attribution visible */
+.bjs-powered-by {
+  opacity: 0.4;
+}
+
+/* ---------- element palette (left rail) ---------- */
+.djs-palette {
+  left: 16px;
+  top: 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-hairline);
+  border-radius: 14px;
+  box-shadow: var(--shadow-soft);
+  padding: 4px;
+}
+
+.djs-palette .separator {
+  border-color: var(--color-hairline);
+  margin: 4px 6px;
+}
+
+.djs-palette .entry {
+  border-radius: 8px;
+  color: var(--color-ink-soft);
+}
+
+.djs-palette .entry:hover {
+  background: var(--color-cobalt-wash);
+  color: var(--color-cobalt);
+}
+
+.djs-palette .highlighted-entry {
+  background: var(--color-cobalt-wash);
+  color: var(--color-cobalt) !important;
+}
+
+/* ---------- context pad (element quick actions) ---------- */
+.djs-context-pad .entry {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-hairline);
+  border-radius: 8px;
+  box-shadow: var(--shadow-soft);
+}
+
+.djs-context-pad .entry:hover {
+  background-color: var(--color-cobalt-wash);
+  border-color: var(--color-cobalt-tint);
+}
+
+/* ---------- selection & hover outlines ---------- */
+.djs-outline,
+.djs-selection-outline {
+  stroke: var(--color-cobalt) !important;
+  stroke-width: 1.5px !important;
+}
+
+.djs-shape.selected .djs-outline {
+  stroke: var(--color-cobalt) !important;
+}
+
+.djs-element.hover .djs-outline {
+  stroke: var(--color-cobalt) !important;
+  stroke-dasharray: 4 3;
+}
+
+/* multi-select lasso */
+.djs-lasso-overlay {
+  stroke: var(--color-cobalt);
+  fill: rgb(30 64 175 / 0.06);
+}
+
+/* resize / bendpoint handles */
+.djs-bendpoint .djs-visual circle,
+.djs-segment-dragger .djs-visual rect,
+.djs-resizer-visual {
+  fill: var(--color-surface);
+  stroke: var(--color-cobalt);
+}
+
+/* snap lines */
+.djs-snap-line {
+  stroke: var(--color-ember);
+  stroke-width: 1px;
+}
+
+/* ---------- popup menus (replace / create menus) ---------- */
+.djs-popup {
+  background: var(--color-surface);
+  border: 1px solid var(--color-hairline);
+  border-radius: 14px;
+  box-shadow: var(--shadow-float);
+  font-family: var(--font-sans);
+}
+
+.djs-popup .djs-popup-header {
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.djs-popup .entry {
+  border-radius: 8px;
+  color: var(--color-ink-soft);
+}
+
+.djs-popup .entry:hover,
+.djs-popup .entry.selected {
+  background: var(--color-cobalt-wash);
+  color: var(--color-cobalt);
+}
+
+.djs-popup-search input {
+  border: 1px solid var(--color-hairline);
+  border-radius: 8px;
+  background: var(--color-paper);
+  font-family: var(--font-sans);
+}
+
+.djs-popup-search input:focus {
+  border-color: var(--color-cobalt);
+  outline: none;
+}
+
+/* ---------- direct editing (label editing) ---------- */
+.djs-direct-editing-parent {
+  border: 1.5px solid var(--color-cobalt) !important;
+  border-radius: 6px;
+  background: var(--color-surface) !important;
+  font-family: var(--font-sans) !important;
+}
+
+/* ---------- tooltips ---------- */
+.djs-tooltip {
+  background: var(--color-ink);
+  color: var(--color-paper);
+  border-radius: 8px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+}
