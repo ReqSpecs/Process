@@ -11,8 +11,12 @@
   "observability": {
     "enabled": true
   }
-  // Secrets (set via `wrangler secret put` or the dashboard):
+  // Build-time vars — Next.js inlines these during `build`, so they belong in
+  // the Workers Builds variable section, not the runtime bindings:
   //   NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+  //   NEXT_PUBLIC_SITE_URL, NEXT_PUBLIC_DEMO_MODE
+  //
+  // Runtime secrets (`wrangler secret put` or the dashboard):
   //   SUPABASE_SECRET_KEY, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET,
-  //   STRIPE_PRICE_{AUD,USD,GBP}_{MONTHLY,YEARLY}, NEXT_PUBLIC_SITE_URL
+  //   STRIPE_PRICE_{AUD,USD,GBP}_{MONTHLY,YEARLY}
 }

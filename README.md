@@ -92,13 +92,27 @@ Enterprise "Coming soon" card. Display-only regular anchors
 
 ### 3. Deploy (Cloudflare)
 
+From your machine:
+
 ```bash
-npm install -D @opennextjs/cloudflare wrangler
 npm run deploy
 ```
 
-Set the env vars as Worker secrets (`wrangler secret put NAME`). Cloudflare
-automatically provides the `cf-ipcountry` header used for currency detection.
+From a git-connected Workers Build, set the build command to `npm run build`
+and the deploy command to `npx wrangler deploy`. `npm run build` runs the
+OpenNext adapter, which calls `next build` and then packages `.open-next/`;
+plain `next build` is available as `build:next` but produces no Worker.
+
+Environment variables land in two different places. The `NEXT_PUBLIC_*` four
+are inlined into the bundle at compile time, so they belong in the Workers
+Builds variable section — setting them only at runtime bakes in `undefined`,
+and changing them needs a rebuild rather than a redeploy. `SUPABASE_SECRET_KEY`
+and the Stripe keys are read per request, so they are runtime secrets
+(`wrangler secret put NAME`).
+
+Point the Stripe webhook at `https://<host>/api/stripe/webhook`. The route is
+POST-only, so a GET returning 405 confirms the Worker owns the domain.
+Cloudflare supplies the `cf-ipcountry` header used for currency detection.
 
 ## How access works
 
