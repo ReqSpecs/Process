@@ -99,9 +99,15 @@ npm run deploy
 ```
 
 From a git-connected Workers Build, set the build command to `npm run build`
-and the deploy command to `npx wrangler deploy`. `npm run build` runs the
-OpenNext adapter, which calls `next build` and then packages `.open-next/`;
-plain `next build` is available as `build:next` but produces no Worker.
+and the deploy command to `npx opennextjs-cloudflare deploy -- --keep-vars`.
+`npm run build` runs the OpenNext adapter, which calls `next build` and then
+packages `.open-next/`; plain `next build` is available as `build:next` but
+produces no Worker.
+
+`--keep-vars` matters: Wrangler treats the config file as the source of truth
+for bindings and deletes any plaintext variable it does not find there, so a
+deploy will silently wipe values entered in the dashboard. Secret bindings
+survive on their own.
 
 Environment variables land in two different places. The `NEXT_PUBLIC_*` four
 are inlined into the bundle at compile time, so they belong in the Workers

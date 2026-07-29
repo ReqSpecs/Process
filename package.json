@@ -10,7 +10,7 @@
     "start": "next start",
     "lint": "next lint",
     "preview": "npm run build && opennextjs-cloudflare preview",
-    "deploy": "npm run build && opennextjs-cloudflare deploy"
+    "deploy": "npm run build && opennextjs-cloudflare deploy -- --keep-vars"
   },
   "repository": {
     "type": "git",
