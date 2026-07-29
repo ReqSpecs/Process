@@ -1,6 +1,6 @@
 import Image from "next/image";
-import Link from "next/link";
 import { ArrowRight, MagicWand } from "@phosphor-icons/react/dist/ssr";
+import { AuthCta } from "@/components/marketing/AuthCta";
 import { SectionShell } from "./SectionShell";
 import { AutomateMock } from "./AutomateMock";
 
@@ -140,9 +140,9 @@ export function AutomateSection() {
           ))}
 
           {/* dark roadmap CTA */}
-          <Link
-            href="/signup"
-            className="group flex flex-col justify-between rounded-2xl bg-ink p-4 transition-transform hover:-translate-y-0.5"
+          <AuthCta
+            next="/start-trial"
+            className="group flex flex-col justify-between rounded-2xl bg-ink p-4 text-left transition-transform hover:-translate-y-0.5"
           >
             <div>
               <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-white">
@@ -166,7 +166,7 @@ export function AutomateSection() {
                 className="transition-transform group-hover:translate-x-0.5"
               />
             </span>
-          </Link>
+          </AuthCta>
         </div>
 
         <p className="text-[11px] leading-relaxed text-ink-faint">

@@ -2,18 +2,37 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { createDemoClient, DEMO_COOKIE, isDemoMode } from "@/lib/demo";
 
-export async function createClient() {
+/**
+ * Concrete client type. Taken from a real call rather than
+ * `ReturnType<typeof createServerClient>`, which instantiates that generic's
+ * type parameters as `unknown` and silently degrades `.from()` to untyped.
+ */
+export type SupabaseServerClient = ReturnType<typeof createServiceClient>;
+
+export async function createClient(): Promise<SupabaseServerClient> {
   const cookieStore = await cookies();
 
   // Dev-only demo mode: serve an in-memory, Supabase-shaped client so the app
   // is fully clickable without a real backend. Never active in production.
   if (isDemoMode() && cookieStore.get(DEMO_COOKIE)?.value === "1") {
-    return createDemoClient() as unknown as ReturnType<typeof createServerClient>;
+    return createDemoClient() as unknown as SupabaseServerClient;
   }
+
+  return createAuthClient();
+}
+
+/**
+ * Always the live Supabase client, even while a demo session cookie is present.
+ * Auth flows need this: the demo stand-in only fakes `getUser`/`signOut`, so
+ * signing up from inside the demo would otherwise hit a client with no
+ * `signInWithOtp` at all.
+ */
+export async function createAuthClient(): Promise<SupabaseServerClient> {
+  const cookieStore = await cookies();
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
       cookies: {
         getAll() {
@@ -37,7 +56,7 @@ export async function createClient() {
 export function createServiceClient() {
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    process.env.SUPABASE_SECRET_KEY!,
     {
       cookies: {
         getAll: () => [],

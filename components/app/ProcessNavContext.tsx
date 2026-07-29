@@ -4,6 +4,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useMemo,
   useState,
   type ReactNode,
 } from "react";
@@ -26,10 +27,9 @@ const ProcessNavCtx = createContext<Ctx | null>(null);
 /** Wraps the app layout so the sidebar can react to the active process page. */
 export function ProcessNavProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<ProcessNavData | null>(null);
+  const value = useMemo<Ctx>(() => ({ data, setData }), [data]);
   return (
-    <ProcessNavCtx.Provider value={{ data, setData }}>
-      {children}
-    </ProcessNavCtx.Provider>
+    <ProcessNavCtx.Provider value={value}>{children}</ProcessNavCtx.Provider>
   );
 }
 
@@ -42,11 +42,14 @@ export function useProcessNav() {
  * Clears the tree on unmount so leaving the editor restores the project list.
  */
 export function SetProcessNav(data: ProcessNavData) {
-  const ctx = useContext(ProcessNavCtx);
+  // Depend only on the stable setter (never the context value object, whose
+  // identity changes whenever `data` updates) to avoid an update loop.
+  const setData = useContext(ProcessNavCtx)?.setData;
   const { project, stages, processes, currentProcessId } = data;
   useEffect(() => {
-    ctx?.setData({ project, stages, processes, currentProcessId });
-    return () => ctx?.setData(null);
-  }, [ctx, project, stages, processes, currentProcessId]);
+    if (!setData) return;
+    setData({ project, stages, processes, currentProcessId });
+    return () => setData(null);
+  }, [setData, project, stages, processes, currentProcessId]);
   return null;
 }

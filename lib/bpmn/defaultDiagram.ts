@@ -16,3 +16,29 @@ export const DEFAULT_BPMN_XML = `<?xml version="1.0" encoding="UTF-8"?>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>
 </bpmn:definitions>`;
+
+/**
+ * Returns the starter diagram, optionally baking in the diagram-wide style
+ * preferences (task border weight, connector weight, connector corner style) so
+ * newly created processes inherit the project's remembered look. Only non-default
+ * values are written, keeping the XML clean. Existing diagrams are never touched —
+ * this only affects fresh XML.
+ */
+export function defaultDiagramXml(prefs?: {
+  borderWeight?: "thin" | "thick";
+  connectorWeight?: "thin" | "thick";
+  cornerStyle?: "sharp" | "round";
+}): string {
+  const attrs: string[] = [];
+  if (prefs?.borderWeight === "thick")
+    attrs.push('prodraw:defaultBorderWeight="thick"');
+  if (prefs?.connectorWeight === "thin")
+    attrs.push('prodraw:defaultConnectorWeight="thin"');
+  if (prefs?.cornerStyle === "sharp")
+    attrs.push('prodraw:defaultCornerStyle="sharp"');
+  if (!attrs.length) return DEFAULT_BPMN_XML;
+  return DEFAULT_BPMN_XML.replace(
+    'xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"',
+    `xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"\n  xmlns:prodraw="http://prodraw.app/schema/bpmn/1.0"\n  ${attrs.join("\n  ")}`,
+  );
+}

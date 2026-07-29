@@ -2,10 +2,18 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { revalidatePath } from "next/cache";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { getStripe } from "@/lib/stripe";
-import { currencyForCountry, isSupportedCurrency, stripePriceId } from "@/lib/pricing";
+import {
+  isBillingInterval,
+  isSupportedCurrency,
+  resolveCurrency,
+  stripePriceId,
+} from "@/lib/pricing";
+import { resolveSettings, type WorkspaceSettings } from "@/lib/ui/settings";
 import type { Workspace } from "@/lib/access";
+import type { BillingInterval, Currency } from "@/lib/constants";
 
 async function getWorkspaceOrRedirect() {
   const supabase = await createClient();
@@ -24,19 +32,24 @@ async function getWorkspaceOrRedirect() {
   return { supabase, workspace, user };
 }
 
-export async function startCheckout() {
+export async function startCheckout(formData?: FormData) {
   const { supabase, workspace, user } = await getWorkspaceOrRedirect();
   const stripe = getStripe();
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+
+  const rawInterval = String(formData?.get("interval") ?? "monthly");
+  const interval: BillingInterval = isBillingInterval(rawInterval)
+    ? rawInterval
+    : "monthly";
 
   // Currency locks on first checkout so re-subscribes stay consistent.
   let currency = workspace.currency;
   if (!currency || !isSupportedCurrency(currency)) {
     const headerList = await headers();
-    currency = currencyForCountry(headerList.get("cf-ipcountry"));
+    currency = resolveCurrency(headerList);
   }
 
-  const priceId = stripePriceId(currency as Parameters<typeof stripePriceId>[0]);
+  const priceId = stripePriceId(currency as Currency, interval);
   if (!priceId) {
     redirect("/settings?error=billing-not-configured");
   }
@@ -54,15 +67,23 @@ export async function startCheckout() {
       .eq("id", workspace.id);
   }
 
+  // First subscribe gets the 7-day free trial; a card is captured up front so
+  // Stripe auto-bills when the trial ends. Re-subscribes (already had a sub)
+  // start billing immediately with no second trial.
+  const isFirstTrial = !workspace.stripe_subscription_id;
+
   const session = await stripe.checkout.sessions.create({
     customer: customerId,
     mode: "subscription",
     line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `${siteUrl}/settings?checkout=success`,
-    cancel_url: `${siteUrl}/settings?checkout=cancelled`,
+    success_url: `${siteUrl}/process-library?checkout=success`,
+    cancel_url: `${siteUrl}/settings?tab=billing&checkout=cancelled`,
     metadata: { workspace_id: workspace.id },
+    // Always collect a payment method so day-8 billing succeeds.
+    payment_method_collection: "always",
     subscription_data: {
       metadata: { workspace_id: workspace.id },
+      ...(isFirstTrial ? { trial_period_days: 7 } : {}),
     },
   });
 
@@ -78,8 +99,94 @@ export async function openBillingPortal() {
 
   const session = await stripe.billingPortal.sessions.create({
     customer: workspace.stripe_customer_id,
-    return_url: `${siteUrl}/settings`,
+    return_url: `${siteUrl}/settings?tab=billing`,
   });
 
   redirect(session.url);
+}
+
+export async function cancelSubscription() {
+  const { workspace } = await getWorkspaceOrRedirect();
+  if (!workspace.stripe_subscription_id) redirect("/settings?tab=billing");
+
+  const stripe = getStripe();
+  await stripe.subscriptions.update(workspace.stripe_subscription_id, {
+    cancel_at_period_end: true,
+  });
+  revalidatePath("/settings");
+  redirect("/settings?tab=billing&cancelled=1");
+}
+
+// ---------- account ----------
+
+export async function updateAccountName(formData: FormData) {
+  const name = String(formData.get("name") ?? "").trim();
+  const supabase = await createClient();
+  await supabase.auth.updateUser({ data: { full_name: name } });
+  revalidatePath("/settings");
+}
+
+// ---------- workspace profile + settings ----------
+
+export async function updateWorkspaceProfile(formData: FormData) {
+  const name = String(formData.get("name") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim();
+
+  const { supabase, workspace } = await getWorkspaceOrRedirect();
+  const update: Record<string, string> = { description };
+  if (name) update.name = name;
+
+  await supabase.from("workspaces").update(update).eq("id", workspace.id);
+  revalidatePath("/", "layout");
+  revalidatePath("/settings");
+}
+
+/** Deep-merge a partial settings patch over the stored blob. */
+export async function saveWorkspaceSettings(patch: {
+  branding?: Partial<WorkspaceSettings["branding"]>;
+  appearance?: Partial<WorkspaceSettings["appearance"]>;
+  defaults?: Partial<WorkspaceSettings["defaults"]>;
+  emails?: Partial<WorkspaceSettings["emails"]>;
+}) {
+  const { supabase, workspace } = await getWorkspaceOrRedirect();
+  const current = resolveSettings(workspace.settings);
+  const next: WorkspaceSettings = {
+    branding: { ...current.branding, ...(patch.branding ?? {}) },
+    appearance: { ...current.appearance, ...(patch.appearance ?? {}) },
+    defaults: { ...current.defaults, ...(patch.defaults ?? {}) },
+    emails: { ...current.emails, ...(patch.emails ?? {}) },
+  };
+
+  await supabase.from("workspaces").update({ settings: next }).eq("id", workspace.id);
+  revalidatePath("/", "layout");
+  revalidatePath("/settings");
+}
+
+// ---------- danger zone ----------
+
+export async function deleteAllData() {
+  const { supabase, workspace } = await getWorkspaceOrRedirect();
+  // Cascades to stages / processes / versions via FK on delete cascade.
+  await supabase.from("projects").delete().eq("workspace_id", workspace.id);
+  revalidatePath("/", "layout");
+  redirect("/settings?deleted=data");
+}
+
+export async function deleteAccount() {
+  const { supabase, workspace, user } = await getWorkspaceOrRedirect();
+
+  if (workspace.stripe_subscription_id) {
+    try {
+      await getStripe().subscriptions.cancel(workspace.stripe_subscription_id);
+    } catch {
+      // Non-fatal: proceed with account removal even if the cancel fails.
+    }
+  }
+
+  // Removing the auth user cascades the workspace (owner_id on delete cascade)
+  // and everything beneath it. Requires the service-role key.
+  const admin = createServiceClient();
+  await admin.auth.admin.deleteUser(user.id);
+  await supabase.auth.signOut();
+  redirect("/");
 }

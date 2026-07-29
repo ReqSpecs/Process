@@ -1,27 +1,32 @@
-"use client";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { hasPassword } from "@/lib/onboarding";
+import { safeNext } from "@/lib/postAuth";
+import { ResetPasswordForm } from "@/components/auth/ResetPasswordForm";
 
-import { useActionState } from "react";
-import { updatePassword } from "@/app/(auth)/actions";
-import { AuthCard, Field, FormError, SubmitButton } from "@/components/auth/AuthCard";
+export default async function ResetPasswordPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-export default function ResetPasswordPage() {
-  const [state, formAction, pending] = useActionState(updatePassword, null);
+  // Getting here means the emailed code was already exchanged for a session.
+  if (!user) redirect("/login?error=auth");
+
+  const next = safeNext(
+    typeof params.next === "string" ? params.next : undefined
+  );
 
   return (
-    <AuthCard title="Choose a new password">
-      <form action={formAction} className="space-y-4">
-        <FormError message={state?.error} />
-        <Field
-          label="New password"
-          name="password"
-          type="password"
-          autoComplete="new-password"
-          placeholder="At least 8 characters"
-          minLength={8}
-          required
-        />
-        <SubmitButton pending={pending}>Update password</SubmitButton>
-      </form>
-    </AuthCard>
+    <ResetPasswordForm
+      next={next}
+      email={user.email ?? ""}
+      isFirstPassword={!(await hasPassword(user.email ?? ""))}
+    />
   );
 }

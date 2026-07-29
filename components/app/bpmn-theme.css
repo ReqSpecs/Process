@@ -15,20 +15,32 @@
   background-size: 20px 20px;
 }
 
-/* hide bpmn.io watermark link styling conflicts; keep attribution visible */
+/* The bpmn.io license requires the watermark/logo to stay FULLY VISIBLE, not
+   restyled, and not overlapped by other elements. Keep it at default; do not
+   hide, fade, move, or cover it. Our own canvas controls are positioned to
+   avoid overlapping it (see ProcessEditor). */
 .bjs-powered-by {
-  opacity: 0.4;
+  opacity: 1;
+  z-index: 20;
 }
 
 /* ---------- element palette (left rail) ---------- */
 .djs-palette {
   left: 16px;
   top: 16px;
+  /* Default palette is 48px (border-box) with 46px entries. Our 4px padding
+     shrinks the content box, so widen to keep entries (and their hover
+     background) fully inside the rounded rail. */
+  width: 56px;
   background: var(--color-surface);
   border: 1px solid var(--color-hairline);
   border-radius: 14px;
   box-shadow: var(--shadow-soft);
   padding: 4px;
+}
+
+.djs-palette.two-column.open {
+  width: 104px;
 }
 
 .djs-palette .separator {
@@ -49,6 +61,114 @@
 .djs-palette .highlighted-entry {
   background: var(--color-cobalt-wash);
   color: var(--color-cobalt) !important;
+}
+
+/* Essentials stencil: tint the create-icons to match the shape colours so the
+   palette previews what will be drawn. Classic stays stock (dark ink). */
+.prodraw-essentials .djs-palette [class*="bpmn-icon-start-event"] {
+  color: #18b84a;
+}
+.prodraw-essentials .djs-palette [class*="bpmn-icon-end-event"] {
+  color: #ec2b2b;
+}
+.prodraw-essentials .djs-palette [class*="bpmn-icon-intermediate-event"] {
+  color: #ff8c00;
+}
+/* Replace the hollow font glyph with a solid disc matching the canvas: flat
+   white centre, orange double ring, drop shadow outside only. */
+.prodraw-essentials .djs-palette .entry[class*="bpmn-icon-intermediate-event"]::before {
+  content: "";
+  display: block;
+  box-sizing: border-box;
+  /* 2px larger than start/end: an outlined white circle optically reads
+     smaller than a solid disc of the same diameter. */
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #ff8c00;
+  /* white gap + inner orange ring */
+  box-shadow:
+    inset 0 0 0 2px #fff,
+    inset 0 0 0 4px #ff8c00;
+  filter: drop-shadow(0 1.5px 1.5px rgba(15, 23, 42, 0.35));
+}
+.prodraw-essentials .djs-palette [class*="bpmn-icon-task"] {
+  color: #29a8e6;
+}
+
+/* Centre custom glyphs perfectly within their palette cells. */
+.prodraw-essentials .djs-palette .entry[class*="bpmn-icon-start-event"],
+.prodraw-essentials .djs-palette .entry[class*="bpmn-icon-end-event"],
+.prodraw-essentials .djs-palette .entry[class*="bpmn-icon-intermediate-event"],
+.prodraw-essentials .djs-palette .entry[class*="bpmn-icon-group"] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Start/End events render as filled gradient discs with a soft drop shadow on
+   the canvas (see STENCIL_STYLES.essentials + prodrawRenderer), so mirror the
+   exact same gradient, edge colour and shadow here, sized to the intermediate
+   double-ring (which keeps its orange ring / white centre). */
+.prodraw-essentials .djs-palette .entry[class*="bpmn-icon-start-event"]::before,
+.prodraw-essentials .djs-palette .entry[class*="bpmn-icon-end-event"]::before {
+  content: "";
+  display: block;
+  box-sizing: border-box;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  filter: drop-shadow(0 1.5px 1.5px rgba(15, 23, 42, 0.35));
+}
+.prodraw-essentials .djs-palette .entry[class*="bpmn-icon-start-event"]::before {
+  background: linear-gradient(to bottom, #5cf08c, #18b84a);
+  border: 1.5px solid #0f7a34;
+}
+.prodraw-essentials .djs-palette .entry[class*="bpmn-icon-end-event"]::before {
+  background: linear-gradient(to bottom, #ff8a82, #ec2b2b);
+  border: 1.75px solid #9e1414;
+}
+
+/* Group: match the canvas — light blue dashed rounded rectangle. */
+.prodraw-essentials .djs-palette .entry[class*="bpmn-icon-group"]::before {
+  content: "";
+  display: block;
+  box-sizing: border-box;
+  width: 26px;
+  height: 20px;
+  border: 1.5px dashed #29a8e6;
+  border-radius: 4px;
+}
+
+/* Pool connector: on the canvas a message flow is a dashed line with an open
+   arrowhead — the stock glyph looks like a plain sequence flow, so draw a
+   dashed line + open arrowhead instead. */
+.prodraw-essentials .djs-palette .entry.bpmn-icon-connection-multi {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.prodraw-essentials .djs-palette .entry.bpmn-icon-connection-multi::before {
+  content: "";
+  display: block;
+  box-sizing: border-box;
+  width: 20px;
+  margin-right: 5px;
+  border-top: 1.6px dashed currentColor;
+}
+.prodraw-essentials .djs-palette .entry.bpmn-icon-connection-multi::after {
+  content: "";
+  position: absolute;
+  box-sizing: border-box;
+  right: 9px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  border-top: 1.6px solid currentColor;
+  border-right: 1.6px solid currentColor;
+  transform: translateY(-50%) rotate(45deg);
 }
 
 /* ---------- context pad (element quick actions) ---------- */
@@ -122,6 +242,13 @@
 .djs-popup .entry.selected {
   background: var(--color-cobalt-wash);
   color: var(--color-cobalt);
+}
+
+/* Divider under the primary task group (User / Service / Manual). */
+.djs-popup-group[data-group="task-primary"] + .djs-popup-group {
+  border-top: 1px solid var(--color-hairline);
+  margin-top: 4px;
+  padding-top: 4px;
 }
 
 .djs-popup-search input {

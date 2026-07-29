@@ -2,20 +2,39 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { validateEmail } from "@/lib/validateEmail";
+import type { User } from "@supabase/supabase-js";
 import {
-  DEMO_COOKIE,
-  DEMO_EMAIL,
-  DEMO_PASSWORD,
-  isDemoMode,
-} from "@/lib/demo";
+  createAuthClient,
+  createClient,
+  createServiceClient,
+} from "@/lib/supabase/server";
+import { validateEmail } from "@/lib/validateEmail";
+import { postAuthDestination, safeNext } from "@/lib/postAuth";
+import { DEMO_COOKIE, DEMO_EMAIL, isDemoMode } from "@/lib/demo";
 
 const DEMO_COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
+const MIN_PASSWORD_LENGTH = 8;
 
-/** Form action for the marketing "Try the demo" button. */
-export async function goToDemoDashboard(): Promise<never> {
-  return enterDemo("/process-library");
+const UNREACHABLE =
+  "We couldn't reach our servers. Check your connection and try again.";
+
+/**
+ * An unreachable backend surfaces as a bare "fetch failed" (Node) or "Failed to
+ * fetch" (browser), sometimes thrown and sometimes returned. Neither string
+ * means anything to a user, and it must not be mistaken for a rejected
+ * credential.
+ */
+function isUnreachable(reason: unknown): boolean {
+  const message =
+    reason && typeof reason === "object" && "message" in reason
+      ? String((reason as { message?: unknown }).message ?? "")
+      : String(reason ?? "");
+  const lowered = message.toLowerCase();
+  return (
+    lowered.includes("fetch failed") ||
+    lowered.includes("failed to fetch") ||
+    lowered.includes("network")
+  );
 }
 
 /** Set the demo session cookie (dev-only, in-memory backend). */
@@ -31,17 +50,70 @@ export async function enterDemo(next?: string): Promise<never> {
   redirect(target);
 }
 
-export type AuthFormState = { error: string } | null;
+/**
+ * Drop the demo session once a real one exists. Without this the rest of the
+ * app keeps reading the in-memory demo store and the user never sees their own
+ * workspace.
+ */
+async function clearDemoSession(): Promise<void> {
+  if (!isDemoMode()) return;
+  const cookieStore = await cookies();
+  if (cookieStore.get(DEMO_COOKIE)) cookieStore.delete(DEMO_COOKIE);
+}
 
-export async function signup(
+export type AuthStep = "email" | "password" | "code";
+export type AuthFormState =
+  | { error?: string; step?: AuthStep; sent?: boolean }
+  | null;
+
+/** "unknown" means the lookup itself failed — never block sign-in over that. */
+type AccountState = "none" | "passwordless" | "password" | "unknown";
+
+function siteUrl(): string {
+  return process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+}
+
+function callbackUrl(next: string): string {
+  return `${siteUrl()}/auth/callback?next=${encodeURIComponent(safeNext(next))}`;
+}
+
+/**
+ * Whether the address has an account, and whether that account has a password.
+ * Drives which step the form shows next. This is an account-existence oracle by
+ * nature — rate-limit the route at the edge.
+ */
+async function accountState(email: string): Promise<AccountState> {
+  if (!email || isDemoMode()) return "unknown";
+  try {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase.rpc("email_account_state", {
+      p_email: email,
+    });
+    if (error) return "unknown";
+    return data === "none" || data === "passwordless" || data === "password"
+      ? data
+      : "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
+/**
+ * Step one of the email flow: validate, then branch. Accounts with a password
+ * get a password field; everyone else gets a code emailed straight away, so a
+ * brand-new signup is one round trip rather than two. Logging in with an
+ * address we've never seen says so instead of quietly opening an account.
+ */
+export async function continueWithEmail(
   _prev: AuthFormState,
   formData: FormData
 ): Promise<AuthFormState> {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  const password = String(formData.get("password") ?? "");
+  const next = String(formData.get("next") ?? "");
+  const isLogin = formData.get("mode") === "login";
 
-  if (password.length < 8) {
-    return { error: "Password must be at least 8 characters." };
+  if (isDemoMode() && email === DEMO_EMAIL) {
+    await enterDemo(next);
   }
 
   const emailCheck = await validateEmail(email);
@@ -49,77 +121,242 @@ export async function signup(
     return { error: emailCheck.reason };
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase.auth.signUp({ email, password });
+  const state = await accountState(email);
 
-  if (error) {
-    return { error: error.message };
+  if (state === "password") {
+    return { step: "password" };
   }
 
-  redirect("/process-library");
+  if (isLogin && state === "none") {
+    return {
+      error: "We couldn't find an account for that email. Create one instead?",
+    };
+  }
+
+  return sendCode(email, next, { createUser: !isLogin });
 }
 
-export async function login(
+/** Kick off Google / Microsoft sign-in. */
+export async function signInWithProvider(formData: FormData) {
+  const raw = String(formData.get("provider") ?? "");
+  if (raw !== "google" && raw !== "azure") {
+    redirect("/login?error=provider");
+  }
+  const next = String(formData.get("next") ?? "");
+
+  const supabase = await createAuthClient();
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: raw,
+    options: {
+      redirectTo: callbackUrl(next),
+      // Supabase rejects Microsoft sign-ins that don't return an email claim.
+      scopes: raw === "azure" ? "openid profile email" : undefined,
+    },
+  });
+
+  if (error || !data.url) {
+    redirect("/login?error=provider");
+  }
+
+  redirect(data.url);
+}
+
+/**
+ * Sends an email containing both a magic link and a 6-digit code. The code is
+ * what survives corporate link scanners and lets people finish in the tab they
+ * started in, rather than whichever device happened to open the mail.
+ */
+async function sendCode(
+  email: string,
+  next: string,
+  options?: { createUser?: boolean }
+): Promise<AuthFormState> {
+  const supabase = await createAuthClient();
+
+  try {
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        shouldCreateUser: options?.createUser ?? true,
+        emailRedirectTo: callbackUrl(next),
+      },
+    });
+    if (error) {
+      return { error: isUnreachable(error) ? UNREACHABLE : error.message };
+    }
+  } catch (cause) {
+    if (!isUnreachable(cause)) throw cause;
+    return { error: UNREACHABLE };
+  }
+
+  return { step: "code", sent: true };
+}
+
+/** Resend from the code step, and the entry point used by the standalone pages. */
+export async function sendMagicLink(
+  _prev: AuthFormState,
+  formData: FormData
+): Promise<AuthFormState> {
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const next = String(formData.get("next") ?? "");
+
+  // Dev-only demo shortcut — no real backend required.
+  if (isDemoMode() && email === DEMO_EMAIL) {
+    await enterDemo(next);
+  }
+
+  const emailCheck = await validateEmail(email);
+  if (!emailCheck.ok) {
+    return { error: emailCheck.reason };
+  }
+
+  return sendCode(email, next);
+}
+
+/** "Forgot password?" — same email, but the code lands them on /reset-password. */
+export async function startPasswordReset(
+  _prev: AuthFormState,
+  formData: FormData
+): Promise<AuthFormState> {
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const emailCheck = await validateEmail(email);
+  if (!emailCheck.ok) {
+    return { error: emailCheck.reason };
+  }
+  return sendCode(email, "/reset-password");
+}
+
+export async function signInWithPassword(
   _prev: AuthFormState,
   formData: FormData
 ): Promise<AuthFormState> {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
+  const next = String(formData.get("next") ?? "");
 
-  // Dev-only demo credentials — no real backend required.
-  if (isDemoMode() && email === DEMO_EMAIL && password === DEMO_PASSWORD) {
-    const next = String(formData.get("next") ?? "");
-    await enterDemo(next);
+  const supabase = await createAuthClient();
+
+  let user: User;
+  // redirect() throws, so the network guard has to stop at the await above it.
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (error || !data.user) {
+      return {
+        error: isUnreachable(error)
+          ? UNREACHABLE
+          : "That email and password don't match.",
+      };
+    }
+    user = data.user;
+  } catch (cause) {
+    if (!isUnreachable(cause)) throw cause;
+    return { error: UNREACHABLE };
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
-
-  if (error) {
-    return { error: "Invalid email or password." };
-  }
-
-  const next = String(formData.get("next") ?? "") || "/process-library";
-  redirect(next.startsWith("/") ? next : "/process-library");
+  await clearDemoSession();
+  redirect(await postAuthDestination(supabase, user, next));
 }
 
-export async function requestPasswordReset(
+/** Verify the 6-digit code from the sign-in email. */
+export async function verifyEmailCode(
   _prev: AuthFormState,
   formData: FormData
 ): Promise<AuthFormState> {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  const supabase = await createClient();
+  const token = String(formData.get("code") ?? "").replace(/\s/g, "");
+  const next = String(formData.get("next") ?? "");
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-  await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${siteUrl}/reset-password`,
-  });
+  if (!token) return { error: "Enter the code from your email." };
 
-  // Always report success to avoid leaking which emails exist.
-  return null;
+  const supabase = await createAuthClient();
+
+  let user: User;
+  try {
+    const { data, error } = await supabase.auth.verifyOtp({
+      email,
+      token,
+      type: "email",
+    });
+    if (error || !data.user) {
+      return {
+        error: isUnreachable(error)
+          ? UNREACHABLE
+          : "That code is invalid or has expired. Request a new one.",
+      };
+    }
+    user = data.user;
+  } catch (cause) {
+    if (!isUnreachable(cause)) throw cause;
+    return { error: UNREACHABLE };
+  }
+
+  await clearDemoSession();
+  redirect(await postAuthDestination(supabase, user, next));
 }
 
+/** /welcome — name, plus a password for email signups. */
+export async function completeProfile(
+  _prev: AuthFormState,
+  formData: FormData
+): Promise<AuthFormState> {
+  const name = String(formData.get("name") ?? "").trim();
+  const password = String(formData.get("password") ?? "");
+  const wantsPassword = formData.get("wants_password") === "1";
+  const productUpdates = formData.get("product_updates") === "1";
+  const next = String(formData.get("next") ?? "");
+
+  if (!name) return { error: "Please tell us what to call you." };
+  if (wantsPassword && password.length < MIN_PASSWORD_LENGTH) {
+    return { error: `Passwords need at least ${MIN_PASSWORD_LENGTH} characters.` };
+  }
+
+  const supabase = await createAuthClient();
+  const { data, error } = await supabase.auth.updateUser({
+    data: { full_name: name, product_updates: productUpdates },
+    ...(wantsPassword ? { password } : {}),
+  });
+
+  if (error || !data.user) {
+    return { error: error?.message ?? "We couldn't save that. Please try again." };
+  }
+
+  redirect(await postAuthDestination(supabase, data.user, next));
+}
+
+/** Used by /reset-password and by Settings. */
 export async function updatePassword(
   _prev: AuthFormState,
   formData: FormData
 ): Promise<AuthFormState> {
   const password = String(formData.get("password") ?? "");
-  if (password.length < 8) {
-    return { error: "Password must be at least 8 characters." };
+  const confirm = String(formData.get("confirm") ?? "");
+  const next = String(formData.get("next") ?? "");
+  const stay = formData.get("stay") === "1";
+
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    return { error: `Passwords need at least ${MIN_PASSWORD_LENGTH} characters.` };
+  }
+  if (password !== confirm) {
+    return { error: "Those passwords don't match." };
   }
 
-  const supabase = await createClient();
+  const supabase = await createAuthClient();
   const { error } = await supabase.auth.updateUser({ password });
+
   if (error) {
     return { error: error.message };
   }
 
-  redirect("/process-library");
+  if (stay) return { sent: true };
+  redirect(safeNext(next));
 }
 
 export async function logout() {
   const cookieStore = await cookies();
-  if (cookieStore.get(DEMO_COOKIE)) {
+  if (isDemoMode() && cookieStore.get(DEMO_COOKIE)) {
     cookieStore.delete(DEMO_COOKIE);
     redirect("/");
   }

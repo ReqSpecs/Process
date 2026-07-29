@@ -148,6 +148,7 @@ function seed(): Store {
     stripe_customer_id: null,
     stripe_subscription_id: null,
     subscription_status: "trialing",
+    billing_alert: null,
     currency: null,
     created_at: created,
     updated_at: created,
@@ -443,9 +444,13 @@ class DemoQuery<T = unknown> implements PromiseLike<QueryResult<T>> {
   }
 }
 
+type DemoAuthResult = { data: { user: typeof DEMO_USER }; error: null };
+
 type DemoClient = {
   auth: {
-    getUser: () => Promise<{ data: { user: typeof DEMO_USER }; error: null }>;
+    getUser: () => Promise<DemoAuthResult>;
+    /** Profile edits in Settings are accepted and discarded. */
+    updateUser: () => Promise<DemoAuthResult>;
     signOut: () => Promise<{ error: null }>;
   };
   from: (table: string) => DemoQuery;
@@ -453,9 +458,11 @@ type DemoClient = {
 
 export function createDemoClient(): DemoClient {
   const store = getStore();
+  const user = async () => ({ data: { user: DEMO_USER }, error: null } as const);
   return {
     auth: {
-      getUser: async () => ({ data: { user: DEMO_USER }, error: null }),
+      getUser: user,
+      updateUser: user,
       signOut: async () => ({ error: null }),
     },
     from: (table: string) => new DemoQuery(store, table),

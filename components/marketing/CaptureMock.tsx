@@ -9,8 +9,8 @@ import {
   ShieldCheck,
   IdentificationCard,
   CreditCard,
-  type Icon,
 } from "@phosphor-icons/react/dist/ssr";
+import type { Icon } from "@phosphor-icons/react";
 
 const COBALT = "#0047AB";
 const VIOLET = "#7C3AED";

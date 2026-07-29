@@ -1,5 +1,7 @@
 ﻿node_modules/
 .next/
 .env.local
+.env*.local
 .open-next/
 .wrangler/
+tsconfig.tsbuildinfo

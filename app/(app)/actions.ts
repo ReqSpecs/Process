@@ -4,9 +4,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAccessState, type Workspace } from "@/lib/access";
-import { DEFAULT_BPMN_XML } from "@/lib/bpmn/defaultDiagram";
+import { defaultDiagramXml } from "@/lib/bpmn/defaultDiagram";
 import { projectSlug } from "@/lib/slug";
 import { STAGE_COLOR_ORDER } from "@/lib/types";
+import { resolveSettings } from "@/lib/ui/settings";
 
 // Revalidate every /project/[slug] page (we don't always know the slug here,
 // and it changes on rename), plus the process library list.
@@ -63,9 +64,10 @@ export async function createProject(formData: FormData) {
   // derived from the name, so duplicates would collide.
   if (await projectNameTaken(supabase, workspace.id, name)) return;
 
+  const status = resolveSettings(workspace.settings).defaults.projectStatus;
   const { data, error } = await supabase
     .from("projects")
-    .insert({ workspace_id: workspace.id, name })
+    .insert({ workspace_id: workspace.id, name, status })
     .select("id")
     .single();
 
@@ -226,9 +228,16 @@ export async function createProcess(formData: FormData) {
   const parentId = String(formData.get("parentId") ?? "") || null;
   const isGroup = String(formData.get("isGroup") ?? "") === "1";
   const name = String(formData.get("name") ?? "").trim();
+  const borderWeight =
+    String(formData.get("borderWeight") ?? "") === "thick" ? "thick" : "thin";
+  const connectorWeight =
+    String(formData.get("connectorWeight") ?? "") === "thin" ? "thin" : "thick";
+  const cornerStyle =
+    String(formData.get("cornerStyle") ?? "") === "sharp" ? "sharp" : "round";
   if (!projectId || !name) return;
 
-  const { supabase } = await requireEditableWorkspace();
+  const { supabase, workspace } = await requireEditableWorkspace();
+  const docStatus = resolveSettings(workspace.settings).defaults.processStatus;
   const { data, error } = await supabase
     .from("processes")
     .insert({
@@ -237,7 +246,10 @@ export async function createProcess(formData: FormData) {
       parent_id: parentId,
       is_group: isGroup,
       name,
-      bpmn_xml: isGroup ? "" : DEFAULT_BPMN_XML,
+      bpmn_xml: isGroup
+        ? ""
+        : defaultDiagramXml({ borderWeight, connectorWeight, cornerStyle }),
+      doc_status: docStatus,
     })
     .select("id")
     .single();
@@ -246,11 +258,6 @@ export async function createProcess(formData: FormData) {
 
   revalidatePath(PROJECT_ROUTE, "page");
   revalidatePath(LIBRARY_ROUTE);
-
-  // Groups are containers — stay on the project screen. Leaf processes open
-  // their BPMN canvas immediately.
-  if (isGroup) return;
-  redirect(`/processes/${data.id}`);
 }
 
 export async function renameProcess(formData: FormData) {

@@ -57,6 +57,7 @@ import {
   resolveProjectIcon,
 } from "@/lib/ui/projectStyle";
 import { projectSlug } from "@/lib/slug";
+import { readDiagramPrefs } from "@/lib/bpmn/diagramPrefs";
 import type {
   ArchitectureStage,
   ProcessRow,
@@ -1819,6 +1820,10 @@ function AddForm({
   return (
     <form
       action={(fd) => {
+        const prefs = readDiagramPrefs(projectId);
+        fd.set("borderWeight", prefs.border);
+        fd.set("connectorWeight", prefs.connector);
+        fd.set("cornerStyle", prefs.corner);
         createProcess(fd);
         onClose();
       }}

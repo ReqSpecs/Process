@@ -1,5 +1,5 @@
 import Image from "next/image";
-import Link from "next/link";
+import { AuthCta } from "@/components/marketing/AuthCta";
 import { LiveProductMock } from "@/components/marketing/LiveProductMock";
 import { AnimatedProcessLine } from "@/components/marketing/AnimatedProcessLine";
 
@@ -52,12 +52,12 @@ export function Hero() {
 
         {/* CTA — buttons directly under the subheading; doodles scattered around */}
         <div className="relative mx-auto mt-7 flex max-w-3xl items-center justify-center gap-3">
-          <Link
-            href="/signup"
+          <AuthCta
+            next="/start-trial"
             className="rounded-lg bg-cobalt px-6 py-3 text-[15px] font-semibold text-white shadow-soft transition-all hover:-translate-y-px hover:bg-cobalt-deep hover:shadow-float"
           >
             Get ProDraw free
-          </Link>
+          </AuthCta>
           <a
             href="#product"
             className="rounded-lg bg-cobalt-wash px-6 py-3 text-[15px] font-semibold text-cobalt transition-colors hover:bg-cobalt-tint/70"
@@ -86,7 +86,7 @@ export function Hero() {
         </div>
 
         <p className="mt-4 text-center text-sm text-ink-faint">
-          Free for 7 days. No credit card required.
+          7-day free trial. Card required, cancel anytime.
         </p>
 
         {/* mockup with process-themed marginalia */}

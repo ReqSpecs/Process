@@ -28,6 +28,7 @@ import {
   resolveProjectColor,
   splitOwners,
 } from "@/lib/ui/projectStyle";
+import { readDiagramPrefs } from "@/lib/bpmn/diagramPrefs";
 
 type RawStatus = "draft" | "in_review" | "approved";
 
@@ -677,7 +678,16 @@ function NewProcessPanel({
             Create a project first, then add processes to it.
           </p>
         ) : (
-          <form action={createProcess} className="space-y-2.5">
+          <form
+            action={(fd) => {
+              const prefs = readDiagramPrefs(String(fd.get("projectId") ?? ""));
+              fd.set("borderWeight", prefs.border);
+              fd.set("connectorWeight", prefs.connector);
+              fd.set("cornerStyle", prefs.corner);
+              createProcess(fd);
+            }}
+            className="space-y-2.5"
+          >
             <div>
               <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-ink-faint">
                 Process name

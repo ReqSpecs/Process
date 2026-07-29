@@ -3,7 +3,7 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CaretDown, Check, User } from "@phosphor-icons/react";
+import { CaretDown, Check, Swatches, User } from "@phosphor-icons/react";
 import { exportProcessPdf } from "@/lib/export/exportProcess";
 import { projectSlug } from "@/lib/slug";
 import type {
@@ -11,6 +11,18 @@ import type {
   SelectionSummary,
 } from "@/components/app/BpmnCanvas";
 import { ProcessRibbon } from "@/components/app/ProcessRibbon";
+import {
+  readBorderWeight,
+  readConnectorWeight,
+  readCornerStyle,
+  readStencil,
+  STENCILS,
+  type BorderWeight,
+  type CornerStyle,
+  type Stencil,
+} from "@/lib/bpmn/stencil";
+
+import { writeDiagramPref } from "@/lib/bpmn/diagramPrefs";
 import type { ProcessDocStatus, ProcessRow, Project } from "@/lib/types";
 
 const BpmnCanvas = dynamic(
@@ -54,6 +66,19 @@ export function ProcessEditor({
   const [api, setApi] = useState<BpmnApi | null>(null);
   const [selection, setSelection] = useState<SelectionSummary>(EMPTY_SELECTION);
   const [ribbonOpen, setRibbonOpen] = useState(true);
+  const [stencil, setStencil] = useState<Stencil>(() =>
+    readStencil(process.bpmn_xml),
+  );
+  const [loadXml, setLoadXml] = useState(process.bpmn_xml);
+  const [borderWeight, setBorderWeight] = useState<BorderWeight>(() =>
+    readBorderWeight(process.bpmn_xml),
+  );
+  const [connectorWeight, setConnectorWeight] = useState<BorderWeight>(() =>
+    readConnectorWeight(process.bpmn_xml),
+  );
+  const [cornerStyle, setCornerStyle] = useState<CornerStyle>(() =>
+    readCornerStyle(process.bpmn_xml),
+  );
 
   const apiRef = useRef<BpmnApi | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -80,6 +105,9 @@ export function ProcessEditor({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
+        // Survive page unload: without this a save fired on refresh/navigate is
+        // cancelled mid-flight, dropping the last change (e.g. a connector toggle).
+        keepalive: true,
       });
       if (!res.ok) throw new Error("save failed");
       docRef.current = {};
@@ -119,6 +147,39 @@ export function ProcessEditor({
     [scheduleSave]
   );
 
+  // Diagram-wide style changes save to this process's XML (via the canvas API's
+  // onChange) AND update the project-scoped preference so every new process in
+  // the project inherits the same look — keeping exports/shares consistent.
+  function changeBorderWeight(next: BorderWeight) {
+    setBorderWeight(next);
+    apiRef.current?.setBorderWeight(next);
+    writeDiagramPref(project.id, "border", next);
+    void flush();
+  }
+
+  function changeConnectorWeight(next: BorderWeight) {
+    setConnectorWeight(next);
+    apiRef.current?.setConnectorWeight(next);
+    writeDiagramPref(project.id, "connector", next);
+    void flush();
+  }
+
+  function changeCornerStyle(next: CornerStyle) {
+    setCornerStyle(next);
+    apiRef.current?.setConnectorCorner(next);
+    writeDiagramPref(project.id, "corner", next);
+    void flush();
+  }
+
+  async function switchStencil(next: Stencil) {
+    if (next === stencil) return;
+    // Capture current edits so the re-init (new stencil) re-imports them.
+    const current = (await apiRef.current?.getXml()) ?? loadXml;
+    setLoadXml(current);
+    setStencil(next);
+    scheduleSave();
+  }
+
   async function handleExport() {
     const a = apiRef.current;
     if (!a) return;
@@ -136,7 +197,7 @@ export function ProcessEditor({
   }
 
   return (
-    <div className="flex h-[calc(100vh-0px)] min-h-0 flex-col">
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
       {/* top bar */}
       <div className="flex shrink-0 items-center gap-3 border-b border-hairline bg-paper px-4 py-2.5">
         <nav className="flex min-w-0 items-center gap-1.5 text-[13px]">
@@ -161,6 +222,9 @@ export function ProcessEditor({
         </nav>
 
         <div className="ml-auto flex shrink-0 items-center gap-2">
+          {!readOnly && (
+            <StencilSelect value={stencil} onChange={switchStencil} />
+          )}
           <SaveStatus state={readOnly ? "saved" : saveState} readOnly={readOnly} />
           <OwnerField
             defaultValue={process.doc_owner}
@@ -186,6 +250,12 @@ export function ProcessEditor({
         <ProcessRibbon
           api={api}
           selection={selection}
+          borderWeight={borderWeight}
+          onBorderWeight={changeBorderWeight}
+          connectorWeight={connectorWeight}
+          onConnectorWeight={changeConnectorWeight}
+          cornerStyle={cornerStyle}
+          onCornerStyle={changeCornerStyle}
           open={ribbonOpen}
           onToggle={toggleRibbon}
         />
@@ -195,8 +265,9 @@ export function ProcessEditor({
       <div className="flex min-h-0 flex-1">
         <div className="relative min-w-0 flex-1">
           <BpmnCanvas
-            xml={process.bpmn_xml}
+            xml={loadXml}
             readOnly={readOnly}
+            stencil={stencil}
             onChange={scheduleSave}
             onSelectionChange={setSelection}
             onReady={(a) => {
@@ -205,8 +276,9 @@ export function ProcessEditor({
             }}
           />
 
-          {/* zoom / undo controls */}
-          <div className="absolute bottom-4 right-4 flex items-center gap-1 rounded-full border border-hairline bg-surface p-1 shadow-soft">
+          {/* zoom / undo controls — kept bottom-left so they never overlap the
+              bpmn.io watermark in the bottom-right (license requirement) */}
+          <div className="absolute bottom-4 left-4 flex items-center gap-1 rounded-full border border-hairline bg-surface p-1 shadow-soft">
             {!readOnly && (
               <>
                 <CanvasButton label="Undo" onClick={() => apiRef.current?.undo()}>
@@ -313,6 +385,60 @@ function StatusSelect({
                 {s.label}
                 {s.value === current && (
                   <Check size={13} weight="bold" className="ml-auto text-ink-faint" />
+                )}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function StencilSelect({
+  value,
+  onChange,
+}: {
+  value: Stencil;
+  onChange: (value: Stencil) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const cfg = STENCILS.find((s) => s.value === value) ?? STENCILS[0];
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        title="Stencil set"
+        className="inline-flex items-center gap-1.5 rounded-full border border-hairline bg-surface px-3 py-1.5 text-[12px] font-semibold text-ink transition-colors hover:border-ink-faint"
+      >
+        <Swatches size={13} weight="bold" className="text-ink-faint" />
+        {cfg.label}
+        <CaretDown size={11} weight="bold" className="text-ink-faint" />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 z-50 mt-1 w-56 overflow-hidden rounded-xl border border-hairline bg-surface p-1 shadow-float">
+            {STENCILS.map((s) => (
+              <button
+                key={s.value}
+                onClick={() => {
+                  setOpen(false);
+                  onChange(s.value);
+                }}
+                className="flex w-full items-start gap-2 rounded-lg px-2.5 py-1.5 text-left transition-colors hover:bg-mist"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[12.5px] font-medium text-ink">
+                    {s.label}
+                  </span>
+                  <span className="block text-[11px] text-ink-faint">
+                    {s.hint}
+                  </span>
+                </span>
+                {s.value === value && (
+                  <Check size={13} weight="bold" className="mt-0.5 shrink-0 text-ink-faint" />
                 )}
               </button>
             ))}

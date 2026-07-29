@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
+import { AuthCta } from "@/components/marketing/AuthCta";
 import { SectionShell } from "./SectionShell";
 
 const PURPLE = "#7C3AED";
@@ -91,18 +91,21 @@ export function RolesSection() {
             Ready when you are
           </p>
           <h3 className="mt-2 max-w-sm text-[22px] font-bold leading-tight tracking-[-0.02em] text-ink sm:text-[26px]">
-            Your processes deserve a better home
-            <span className="text-ember">.</span>
+            <span className="block">Your processes deserve</span>
+            <span className="block">
+              a better home
+              <span className="text-ember">.</span>
+            </span>
           </h3>
           <p className="mt-2.5 max-w-xs text-[15px] leading-relaxed text-ink-soft">
             Set up your workspace in under a minute.
           </p>
-          <Link
-            href="/signup"
+          <AuthCta
+            next="/start-trial"
             className="mt-5 inline-block rounded-lg bg-[#7c3aed] px-6 py-3 text-[15px] font-semibold text-white shadow-soft transition-all hover:-translate-y-px hover:bg-[#6d28d9] hover:shadow-float"
           >
             Start free
-          </Link>
+          </AuthCta>
         </div>
       </div>
     </SectionShell>

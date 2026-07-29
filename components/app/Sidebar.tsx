@@ -56,7 +56,7 @@ export function Sidebar({
     <>
       <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-hairline bg-paper">
         <div className="px-4 pb-2 pt-5">
-          <Link href="/process-library" aria-label="Process library">
+          <Link href="/" aria-label="Home">
             <Wordmark className="h-5" />
           </Link>
         </div>
@@ -220,7 +220,7 @@ export function Sidebar({
         <div className="space-y-0.5 border-t border-hairline p-2">
           <button
             onClick={() => setFeedbackOpen(true)}
-            className="block w-full rounded-lg px-3 py-2 text-left text-[14px] font-medium text-ink-soft transition-colors hover:bg-mist/60 hover:text-ink"
+            className="block w-full cursor-pointer rounded-lg px-3 py-2 text-left text-[14px] font-medium text-ink-soft transition-colors hover:bg-mist/60 hover:text-ink"
           >
             Suggest a feature
           </button>
@@ -243,7 +243,7 @@ export function Sidebar({
           <form action={logout}>
             <button
               type="submit"
-              className="block w-full rounded-lg px-3 py-2 text-left text-[14px] font-medium text-ink-faint transition-colors hover:bg-mist/60 hover:text-ink"
+              className="block w-full cursor-pointer rounded-lg px-3 py-2 text-left text-[14px] font-medium text-ink-faint transition-colors hover:bg-mist/60 hover:text-ink"
             >
               Log out
             </button>
@@ -312,7 +312,7 @@ function ProcessNavTree({
         <button
           onClick={() => toggle(proc.id)}
           style={{ paddingLeft: 12 + depth * 14 }}
-          className="flex w-full items-center gap-1.5 rounded-lg py-1.5 pr-2 text-[13px] font-medium text-ink-soft transition-colors hover:bg-mist/60 hover:text-ink"
+          className="flex w-full cursor-pointer items-center gap-1.5 rounded-lg py-1.5 pr-2 text-[13px] font-medium text-ink-soft transition-colors hover:bg-mist/60 hover:text-ink"
         >
           {isCollapsed ? (
             <CaretRight size={12} weight="bold" className="shrink-0 text-ink-faint" />
@@ -350,15 +350,24 @@ function ProcessNavTree({
         Processes
       </p>
 
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {stages.map((stage) => {
           const items = topOf(stage.id);
           const c = stageColor(stage.color);
+          const isCollapsed = collapsed[stage.id];
           return (
             <div key={stage.id}>
-              <div className="flex items-center gap-2 px-3 py-1">
+              <button
+                onClick={() => toggle(stage.id)}
+                className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-1.5 transition-colors hover:bg-mist/60"
+              >
+                {isCollapsed ? (
+                  <CaretRight size={12} weight="bold" className="shrink-0 text-ink-faint" />
+                ) : (
+                  <CaretDown size={12} weight="bold" className="shrink-0 text-ink-faint" />
+                )}
                 <span
-                  className="h-2.5 w-2.5 shrink-0 rounded-full"
+                  className="h-3 w-3 shrink-0 rounded-[4px]"
                   style={{ background: c.fill }}
                 />
                 <span className="truncate text-[12.5px] font-semibold text-ink">
@@ -367,9 +376,9 @@ function ProcessNavTree({
                 <span className="ml-auto text-[11px] tabular-nums text-ink-faint">
                   {items.length}
                 </span>
-              </div>
-              {items.length > 0 && (
-                <ul className="space-y-0.5">
+              </button>
+              {!isCollapsed && items.length > 0 && (
+                <ul className="mt-0.5 space-y-0.5">
                   {items.map((p) => (
                     <Node key={p.id} proc={p} depth={1} />
                   ))}
@@ -381,20 +390,30 @@ function ProcessNavTree({
 
         {unassigned.length > 0 && (
           <div>
-            <div className="flex items-center gap-2 px-3 py-1">
-              <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-ink-faint/40" />
+            <button
+              onClick={() => toggle("__unassigned")}
+              className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-1.5 transition-colors hover:bg-mist/60"
+            >
+              {collapsed["__unassigned"] ? (
+                <CaretRight size={12} weight="bold" className="shrink-0 text-ink-faint" />
+              ) : (
+                <CaretDown size={12} weight="bold" className="shrink-0 text-ink-faint" />
+              )}
+              <span className="h-3 w-3 shrink-0 rounded-[4px] bg-ink-faint/40" />
               <span className="truncate text-[12.5px] font-semibold text-ink">
                 Unassigned
               </span>
               <span className="ml-auto text-[11px] tabular-nums text-ink-faint">
                 {unassigned.length}
               </span>
-            </div>
-            <ul className="space-y-0.5">
-              {unassigned.map((p) => (
-                <Node key={p.id} proc={p} depth={1} />
-              ))}
-            </ul>
+            </button>
+            {!collapsed["__unassigned"] && (
+              <ul className="mt-0.5 space-y-0.5">
+                {unassigned.map((p) => (
+                  <Node key={p.id} proc={p} depth={1} />
+                ))}
+              </ul>
+            )}
           </div>
         )}
       </div>

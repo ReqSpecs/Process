@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getAccessState, type Workspace } from "@/lib/access";
+import { getAccessState, needsTrialSetup, type Workspace } from "@/lib/access";
+import { needsOnboarding } from "@/lib/onboarding";
 import { Sidebar } from "@/components/app/Sidebar";
 import { ProcessNavProvider } from "@/components/app/ProcessNavContext";
 import { TrialBanner } from "@/components/app/TrialBanner";
@@ -25,6 +26,11 @@ export default async function AppLayout({
 
   if (!workspace) redirect("/login");
 
+  // Backstop for anyone who navigated straight here mid-signup. Order matches
+  // the callback: finish the profile, then take a card, then let them in.
+  if (await needsOnboarding(user)) redirect("/welcome");
+  if (needsTrialSetup(workspace)) redirect("/start-trial");
+
   const { data: projects } = await supabase
     .from("projects")
     .select("*")
@@ -36,15 +42,17 @@ export default async function AppLayout({
 
   return (
     <ProcessNavProvider>
-      <div className="flex min-h-screen bg-surface">
+      <div className="flex h-screen overflow-hidden bg-surface">
         <Sidebar
           projects={projects ?? []}
           email={user.email ?? ""}
           access={access}
         />
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <TrialBanner access={access} />
-          <main className="flex min-w-0 flex-1 flex-col">{children}</main>
+          <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto">
+            {children}
+          </main>
         </div>
       </div>
     </ProcessNavProvider>

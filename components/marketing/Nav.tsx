@@ -3,12 +3,11 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Wordmark } from "@/components/Wordmark";
-import { goToDemoDashboard } from "@/app/(auth)/actions";
-
-const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+import { useAuthModal } from "@/components/auth/AuthModal";
 
 export function Nav() {
   const [scrolled, setScrolled] = useState(false);
+  const auth = useAuthModal();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -25,43 +24,37 @@ export function Nav() {
           : "border-transparent bg-surface"
       }`}
     >
-      <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-8">
-        <Link href="/" aria-label="ProDraw home">
+      <nav className="relative mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-8">
+        <Link href="/" aria-label="ProDraw home" className="relative z-10">
           <Wordmark className="h-6" />
         </Link>
 
-        <div className="hidden items-center gap-8 text-[15px] font-medium text-ink-soft sm:flex">
-          <a href="#product" className="transition-colors hover:text-ink">
-            Product
-          </a>
-          <Link href="/pricing" className="transition-colors hover:text-ink">
-            Pricing
-          </Link>
+        <div className="pointer-events-none absolute inset-0 hidden items-center justify-center sm:flex">
+          <div className="pointer-events-auto flex items-center gap-8 text-[15px] font-medium text-ink">
+            <Link href="/" className="transition-colors hover:text-ink">
+              Product
+            </Link>
+            <Link href="/pricing" className="transition-colors hover:text-ink">
+              Pricing
+            </Link>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          {DEMO_MODE && (
-            <form action={goToDemoDashboard}>
-              <button
-                type="submit"
-                className="rounded-lg px-3 py-2 text-[15px] font-medium text-cobalt transition-colors hover:bg-cobalt-wash"
-              >
-                Try the demo
-              </button>
-            </form>
-          )}
-          <Link
-            href="/login"
-            className="rounded-lg px-3 py-2 text-[15px] font-medium text-ink-soft transition-colors hover:bg-mist hover:text-ink"
+        <div className="relative z-10 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => auth.open("login")}
+            className="rounded-lg px-3 py-2 text-[15px] font-medium text-ink transition-colors hover:bg-mist"
           >
             Log in
-          </Link>
-          <Link
-            href="/signup"
+          </button>
+          <button
+            type="button"
+            onClick={() => auth.open("signup", { next: "/start-trial" })}
             className="rounded-lg bg-cobalt px-4 py-2 text-[15px] font-semibold text-white shadow-soft transition-colors hover:bg-cobalt-deep"
           >
-            Start free
-          </Link>
+            Start trial
+          </button>
         </div>
       </nav>
     </header>

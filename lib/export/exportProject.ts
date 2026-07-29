@@ -153,11 +153,19 @@ function drawDocBlock(doc: jsPDF, process: ProcessRow) {
 
 /* ------------------------------------------------- off-screen bpmn viewer */
 
+type BpmnViewer = {
+  importXML: (xml: string) => Promise<unknown>;
+  saveSVG: () => Promise<{ svg: string }>;
+  get: (m: string) => { zoom: (l: "fit-viewport") => void };
+  destroy: () => void;
+};
+
 async function createBpmnRenderer() {
   const { default: Viewer } = await import("bpmn-js/lib/Viewer");
-  const { prodrawViewerModule, prodrawModdleDescriptor } = await import(
+  const { makeProdrawViewerModule, prodrawModdleDescriptor } = await import(
     "@/lib/bpmn/prodrawModules"
   );
+  const { readStencil } = await import("@/lib/bpmn/stencil");
 
   const holder = document.createElement("div");
   holder.style.position = "fixed";
@@ -167,37 +175,41 @@ async function createBpmnRenderer() {
   holder.style.height = "900px";
   document.body.appendChild(holder);
 
-  const viewer = new (Viewer as unknown as new (options: {
+  const Ctor = Viewer as unknown as new (options: {
     container: HTMLElement;
     additionalModules?: unknown[];
     moddleExtensions?: Record<string, unknown>;
-  }) => InstanceType<typeof Viewer>)({
-    container: holder,
-    additionalModules: [prodrawViewerModule],
-    moddleExtensions: { prodraw: prodrawModdleDescriptor },
-  });
+  }) => BpmnViewer;
+
+  // One viewer per stencil so each diagram exports with its own styling.
+  const viewers: Record<string, BpmnViewer> = {};
+  const getViewer = (stencil: string): BpmnViewer => {
+    if (!viewers[stencil]) {
+      viewers[stencil] = new Ctor({
+        container: holder,
+        additionalModules: [makeProdrawViewerModule(stencil as never)],
+        moddleExtensions: { prodraw: prodrawModdleDescriptor },
+      });
+    }
+    return viewers[stencil];
+  };
 
   const render = async (xml: string): Promise<string> => {
     if (!xml || !xml.trim()) throw new Error("empty diagram");
+    const viewer = getViewer(readStencil(xml));
     await viewer.importXML(xml);
     // Fit the diagram so saveSVG captures the whole model (mirrors the editor).
     try {
-      (viewer as unknown as {
-        get: (m: string) => { zoom: (l: "fit-viewport") => void };
-      })
-        .get("canvas")
-        .zoom("fit-viewport");
+      viewer.get("canvas").zoom("fit-viewport");
     } catch {
       /* zoom is best-effort */
     }
-    const { svg } = await (
-      viewer as unknown as { saveSVG: () => Promise<{ svg: string }> }
-    ).saveSVG();
+    const { svg } = await viewer.saveSVG();
     return svg;
   };
 
   render.destroy = () => {
-    viewer.destroy();
+    Object.values(viewers).forEach((v) => v.destroy());
     holder.remove();
   };
 
