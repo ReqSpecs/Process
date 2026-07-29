@@ -9,6 +9,7 @@ import {
   createServiceClient,
 } from "@/lib/supabase/server";
 import { validateEmail } from "@/lib/validateEmail";
+import { siteUrl } from "@/lib/site";
 import { postAuthDestination, safeNext } from "@/lib/postAuth";
 import { DEMO_COOKIE, DEMO_EMAIL, isDemoMode } from "@/lib/demo";
 
@@ -68,10 +69,6 @@ export type AuthFormState =
 
 /** "unknown" means the lookup itself failed — never block sign-in over that. */
 type AccountState = "none" | "passwordless" | "password" | "unknown";
-
-function siteUrl(): string {
-  return process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-}
 
 function callbackUrl(next: string): string {
   return `${siteUrl()}/auth/callback?next=${encodeURIComponent(safeNext(next))}`;

@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type Stripe from "stripe";
-import { getStripe } from "@/lib/stripe";
+import { getStripe, getStripeCryptoProvider } from "@/lib/stripe";
 import { createServiceClient } from "@/lib/supabase/server";
 import type { BillingAlert } from "@/lib/access";
 import type { SupabaseServerClient } from "@/lib/supabase/server";
@@ -62,7 +62,9 @@ export async function POST(request: NextRequest) {
     event = await stripe.webhooks.constructEventAsync(
       body,
       signature,
-      process.env.STRIPE_WEBHOOK_SECRET!
+      process.env.STRIPE_WEBHOOK_SECRET!,
+      undefined,
+      getStripeCryptoProvider()
     );
   } catch {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });

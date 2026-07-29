@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { getStripe } from "@/lib/stripe";
+import { siteUrl } from "@/lib/site";
 import {
   isBillingInterval,
   isSupportedCurrency,
@@ -35,7 +36,7 @@ async function getWorkspaceOrRedirect() {
 export async function startCheckout(formData?: FormData) {
   const { supabase, workspace, user } = await getWorkspaceOrRedirect();
   const stripe = getStripe();
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const baseUrl = siteUrl();
 
   const rawInterval = String(formData?.get("interval") ?? "monthly");
   const interval: BillingInterval = isBillingInterval(rawInterval)
@@ -76,8 +77,8 @@ export async function startCheckout(formData?: FormData) {
     customer: customerId,
     mode: "subscription",
     line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `${siteUrl}/process-library?checkout=success`,
-    cancel_url: `${siteUrl}/settings?tab=billing&checkout=cancelled`,
+    success_url: `${baseUrl}/process-library?checkout=success`,
+    cancel_url: `${baseUrl}/settings?tab=billing&checkout=cancelled`,
     metadata: { workspace_id: workspace.id },
     // Always collect a payment method so day-8 billing succeeds.
     payment_method_collection: "always",
@@ -95,11 +96,9 @@ export async function openBillingPortal() {
   if (!workspace.stripe_customer_id) redirect("/settings");
 
   const stripe = getStripe();
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-
   const session = await stripe.billingPortal.sessions.create({
     customer: workspace.stripe_customer_id,
-    return_url: `${siteUrl}/settings?tab=billing`,
+    return_url: `${siteUrl()}/settings?tab=billing`,
   });
 
   redirect(session.url);
