@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { PricingTable } from "@/components/marketing/PricingSection";
+import { getPlanCatalog } from "@/lib/planCatalog";
 import { resolveCurrency } from "@/lib/pricing";
 
 export const metadata: Metadata = { title: "Pricing" };
@@ -22,5 +23,13 @@ export default async function PricingPage({
     country: first(params.country),
   });
 
-  return <PricingTable initialCurrency={currency} />;
+  const { name, pricing } = await getPlanCatalog();
+
+  return (
+    <PricingTable
+      initialCurrency={currency}
+      plan={pricing[currency]}
+      planName={name}
+    />
+  );
 }

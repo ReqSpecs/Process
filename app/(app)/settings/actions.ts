@@ -9,8 +9,8 @@ import {
   isBillingInterval,
   isSupportedCurrency,
   resolveCurrency,
-  stripePriceId,
 } from "@/lib/pricing";
+import { stripePriceId } from "@/lib/planCatalog";
 import { resolveSettings, type WorkspaceSettings } from "@/lib/ui/settings";
 import type { Workspace } from "@/lib/access";
 import type { BillingInterval, Currency } from "@/lib/constants";
@@ -49,7 +49,7 @@ export async function startCheckout(formData?: FormData) {
     currency = resolveCurrency(headerList);
   }
 
-  const priceId = stripePriceId(currency as Currency, interval);
+  const priceId = await stripePriceId(currency as Currency, interval);
   if (!priceId) {
     redirect("/settings?error=billing-not-configured");
   }

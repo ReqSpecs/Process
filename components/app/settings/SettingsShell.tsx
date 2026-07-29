@@ -11,7 +11,7 @@ import {
   type Icon,
 } from "@phosphor-icons/react";
 import type { AccessState } from "@/lib/access";
-import type { Currency } from "@/lib/constants";
+import type { Currency, PlanPrice } from "@/lib/constants";
 import type { WorkspaceSettings } from "@/lib/ui/settings";
 import { AccountSection } from "./AccountSection";
 import { AppearanceSection } from "./AppearanceSection";
@@ -61,6 +61,8 @@ export function SettingsShell({
   billing: {
     symbol: string;
     currency: Currency;
+    plan: PlanPrice;
+    planName: string;
     hasSubscription: boolean;
   };
   banners: {
@@ -148,6 +150,8 @@ export function SettingsShell({
             access={access}
             symbol={billing.symbol}
             currency={billing.currency}
+            plan={billing.plan}
+            planName={billing.planName}
             hasSubscription={billing.hasSubscription}
           />
         )}

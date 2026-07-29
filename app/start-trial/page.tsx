@@ -7,6 +7,7 @@ import { needsOnboarding } from "@/lib/onboarding";
 import { logout } from "@/app/(auth)/actions";
 import { StartTrialForm } from "@/components/marketing/StartTrialForm";
 import { Wordmark } from "@/components/Wordmark";
+import { getPlanCatalog } from "@/lib/planCatalog";
 import { currencyForCountry, isBillingInterval } from "@/lib/pricing";
 import { TRIAL_DAYS, type BillingInterval, type Currency } from "@/lib/constants";
 
@@ -48,6 +49,8 @@ export default async function StartTrialPage({
     ? rawPlan
     : "monthly";
 
+  const { name: planName, pricing } = await getPlanCatalog();
+
   return (
     <div className="min-h-dvh bg-surface">
       <header className="flex items-center justify-between border-b border-hairline px-6 py-4">
@@ -71,7 +74,12 @@ export default async function StartTrialPage({
           unlock it. You won&apos;t be charged today.
         </p>
 
-        <StartTrialForm currency={currency} initialInterval={initialInterval} />
+        <StartTrialForm
+          currency={currency}
+          plan={pricing[currency]}
+          planName={planName}
+          initialInterval={initialInterval}
+        />
       </main>
     </div>
   );

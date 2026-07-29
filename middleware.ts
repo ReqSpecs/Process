@@ -11,8 +11,10 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Match all request paths except static assets and images.
+     * Everything except static assets, images, and route handlers. `/api` does
+     * its own auth, so session refresh there is dead weight — and it would put
+     * a Supabase round trip in front of every Stripe webhook.
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!api/|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

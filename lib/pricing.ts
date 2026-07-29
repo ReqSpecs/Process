@@ -1,8 +1,8 @@
 import {
-  PLAN_PRICING,
   SUPPORTED_CURRENCIES,
   type BillingInterval,
   type Currency,
+  type PlanPrice,
 } from "@/lib/constants";
 
 /** Map a cf-ipcountry header value to a supported display currency. */
@@ -54,42 +54,11 @@ export function isBillingInterval(value: string): value is BillingInterval {
 }
 
 /** Monthly-equivalent early-adopter price for the selected interval. */
-export function planPrice(currency: Currency, interval: BillingInterval): number {
-  const plan = PLAN_PRICING[currency];
+export function planPrice(plan: PlanPrice, interval: BillingInterval): number {
   return interval === "yearly" ? plan.yearlyMonthly : plan.monthly;
-}
-
-/** Annual total when paying yearly. */
-export function yearlyTotal(currency: Currency): number {
-  return PLAN_PRICING[currency].yearlyTotal;
-}
-
-/** Display-only struck-through regular monthly price. */
-export function regularPrice(currency: Currency): number {
-  return PLAN_PRICING[currency].regularMonthly;
-}
-
-/** Yearly savings vs monthly, as a whole percent (e.g. 20). */
-export function savingsPercent(currency: Currency): number {
-  const plan = PLAN_PRICING[currency];
-  return Math.round((1 - plan.yearlyMonthly / plan.monthly) * 100);
 }
 
 /** Format a price: whole numbers stay whole; decimals show 2 places. */
 export function formatPrice(amount: number): string {
   return Number.isInteger(amount) ? String(amount) : amount.toFixed(2);
-}
-
-/** Stripe price IDs per currency + interval, set via env once products exist. */
-export function stripePriceId(
-  currency: Currency,
-  interval: BillingInterval = "monthly"
-): string | undefined {
-  const suffix = interval === "yearly" ? "YEARLY" : "MONTHLY";
-  const map: Record<Currency, string | undefined> = {
-    AUD: process.env[`STRIPE_PRICE_AUD_${suffix}`],
-    USD: process.env[`STRIPE_PRICE_USD_${suffix}`],
-    GBP: process.env[`STRIPE_PRICE_GBP_${suffix}`],
-  };
-  return map[currency];
 }

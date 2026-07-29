@@ -7,25 +7,29 @@ import {
   CURRENCY_SYMBOLS,
   EARLY_ADOPTER_FEATURES,
   ENTERPRISE_FEATURES,
-  PLAN_PRICING,
   TRIAL_DAYS,
   type BillingInterval,
   type Currency,
+  type PlanPrice,
 } from "@/lib/constants";
-import { formatPrice, planPrice, yearlyTotal } from "@/lib/pricing";
+import { formatPrice, planPrice } from "@/lib/pricing";
 
 export function StartTrialForm({
   currency,
+  plan,
+  planName,
   initialInterval = "monthly",
 }: {
   currency: Currency;
+  plan: PlanPrice;
+  planName: string;
   initialInterval?: BillingInterval;
 }) {
   const [interval, setInterval] = useState<BillingInterval>(initialInterval);
   const symbol = CURRENCY_SYMBOLS[currency];
-  const early = planPrice(currency, interval);
-  const annual = yearlyTotal(currency);
-  const regular = PLAN_PRICING[currency].regularMonthly;
+  const early = planPrice(plan, interval);
+  const annual = plan.yearlyTotal;
+  const regular = plan.regularMonthly;
 
   return (
     <section className="mt-7" aria-label="Compare plans">
@@ -63,7 +67,7 @@ export function StartTrialForm({
       <div className="mt-5 grid items-stretch gap-5 lg:grid-cols-2">
         <article className="relative flex h-full flex-col rounded-2xl border border-hairline bg-surface p-7 sm:p-8">
           <div className="flex min-h-[34px] flex-wrap items-center gap-2.5">
-            <h3 className="text-[17px] font-bold text-ink">Early adopter</h3>
+            <h3 className="text-[17px] font-bold text-ink">{planName}</h3>
             <span className="rounded-full bg-[#aef029] px-3.5 py-1 text-[13px] font-bold tracking-[-0.01em] text-ink">
               Founding price
             </span>
@@ -150,14 +154,14 @@ export function StartTrialForm({
               Not yet available
             </button>
             <p className="mt-2.5 text-[12.5px] leading-relaxed text-ink-faint">
-              Start on Early adopter and move your workspace across when
-              Enterprise opens up.
+              Start on {planName} and move your workspace across when Enterprise
+              opens up.
             </p>
           </div>
 
           <div className="mt-7 flex flex-1 flex-col border-t border-cobalt-tint pt-6">
             <p className="text-[14px] font-semibold text-ink">
-              Everything in Early adopter, and:
+              Everything in {planName}, and:
             </p>
             <ul className="mt-3.5 space-y-2.5">
               {ENTERPRISE_FEATURES.map((f) => (

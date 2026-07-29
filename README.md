@@ -60,12 +60,17 @@ Supabase project.
 
 ### 2. Stripe
 
-1. Create one product ("ProDraw Early Adopter") with **six** recurring prices
+1. Create one product ("Early Adopter") with **six** recurring prices
    (3 currencies × monthly/yearly):
    - Monthly: A$15 AUD, US$10 USD, £8 GBP
    - Yearly (20% off): A$144/yr, US$96/yr, £76.80/yr
-2. Put the six price IDs in `.env.local` as
-   `STRIPE_PRICE_{AUD,USD,GBP}_{MONTHLY,YEARLY}`.
+
+   Don't attach a trial to the price — checkout grants it per session so that
+   only a workspace's first subscription gets one.
+2. Put the product ID in `STRIPE_PRODUCT_ID`. `lib/planCatalog` reads its active
+   prices (newest wins per currency/interval), caches them for an hour, and
+   falls back to `PLAN_PRICING` in `lib/constants` if Stripe can't be reached,
+   so a price change in Stripe needs no deploy.
 3. Add a webhook endpoint pointing at `/api/stripe/webhook` with these events,
    then copy the signing secret to `STRIPE_WEBHOOK_SECRET`:
    - `checkout.session.completed` — records the subscription and trial end
@@ -87,8 +92,9 @@ auto-bills when the trial ends; the webhook records `trialing` +
 `trial_ends_at`, then syncs to `active` / `past_due` / `canceled`.
 
 The public `/pricing` page shows Early Adopter (purchasable) beside an
-Enterprise "Coming soon" card. Display-only regular anchors
-(A$39 / US$29 / £19) highlight the founding discount.
+Enterprise "Coming soon" card. The struck-through anchors (A$45 / US$29 / £25)
+stay in `lib/constants` — they are never charged, so Stripe has no price for
+them.
 
 ### 3. Deploy (Cloudflare)
 

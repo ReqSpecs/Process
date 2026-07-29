@@ -8,11 +8,11 @@ import {
   CURRENCY_SYMBOLS,
   EARLY_ADOPTER_FEATURES,
   ENTERPRISE_FEATURES,
-  PLAN_PRICING,
   type BillingInterval,
   type Currency,
+  type PlanPrice,
 } from "@/lib/constants";
-import { formatPrice, planPrice, yearlyTotal } from "@/lib/pricing";
+import { formatPrice, planPrice } from "@/lib/pricing";
 
 // Same pre-trimmed logo set as the homepage brand strip.
 const TRUST_LOGOS: { src: string; name: string; h: string }[] = [
@@ -25,16 +25,19 @@ const TRUST_LOGOS: { src: string; name: string; h: string }[] = [
 
 export function PricingTable({
   initialCurrency,
+  plan,
+  planName,
 }: {
   initialCurrency: Currency;
+  plan: PlanPrice;
+  planName: string;
 }) {
   const [interval, setInterval] = useState<BillingInterval>("monthly");
   const currency = initialCurrency;
 
   const symbol = CURRENCY_SYMBOLS[currency];
-  const plan = PLAN_PRICING[currency];
-  const early = planPrice(currency, interval);
-  const annual = yearlyTotal(currency);
+  const early = planPrice(plan, interval);
+  const annual = plan.yearlyTotal;
 
   return (
     <section className="relative overflow-x-clip bg-surface px-5 py-14 sm:px-8 sm:py-20">
@@ -146,7 +149,7 @@ export function PricingTable({
 
               <div className="mt-9 flex min-h-[34px] items-center gap-2.5">
                 <span className="text-[17px] font-bold text-ink">
-                  Early adopter
+                  {planName}
                 </span>
                 <span className="rounded-full bg-[#aef029] px-3.5 py-1 text-[13px] font-bold tracking-[-0.01em] text-ink">
                   Founding price
@@ -236,13 +239,13 @@ export function PricingTable({
                   Coming soon
                 </button>
                 <p className="mt-2.5 text-[12.5px] text-ink">
-                  Upgrade from Early Adopter anytime to add your team.
+                  Upgrade from {planName} anytime to add your team.
                 </p>
               </div>
 
               <div className="mt-8 flex flex-1 flex-col border-t border-cobalt-tint pt-6">
                 <p className="text-[14px] font-semibold text-ink">
-                  Everything in Early Adopter, and:
+                  Everything in {planName}, and:
                 </p>
                 <ul className="mt-3.5 space-y-2.5">
                   {ENTERPRISE_FEATURES.map((f) => (

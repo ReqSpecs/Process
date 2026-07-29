@@ -41,20 +41,28 @@ export const ENTERPRISE_FEATURES = [
   "Priority support",
 ] as const;
 
+/** Stands in until Stripe's product name loads; see `lib/planCatalog`. */
+export const PLAN_NAME = "Early adopter";
+
+export type PlanPrice = {
+  monthly: number;
+  /** Yearly total spread over 12 months, for display beside the monthly rate. */
+  yearlyMonthly: number;
+  yearlyTotal: number;
+  /** Display-only struck-through anchor. Never charged, so never in Stripe. */
+  regularMonthly: number;
+};
+
 /**
  * Early-adopter plan pricing. Yearly is 20% off the monthly rate, billed
- * annually. `regularMonthly` is the display-only struck-through anchor.
+ * annually.
+ *
+ * Stripe is the source of truth for what gets charged — see `lib/planCatalog`.
+ * These amounts stand in when Stripe can't be reached, and always supply
+ * `regularMonthly`.
  */
-export const PLAN_PRICING: Record<
-  Currency,
-  {
-    monthly: number;
-    yearlyMonthly: number;
-    yearlyTotal: number;
-    regularMonthly: number;
-  }
-> = {
-  AUD: { monthly: 15, yearlyMonthly: 12, yearlyTotal: 144, regularMonthly: 39 },
+export const PLAN_PRICING: Record<Currency, PlanPrice> = {
+  AUD: { monthly: 15, yearlyMonthly: 12, yearlyTotal: 144, regularMonthly: 45 },
   USD: { monthly: 10, yearlyMonthly: 8, yearlyTotal: 96, regularMonthly: 29 },
-  GBP: { monthly: 8, yearlyMonthly: 6.4, yearlyTotal: 76.8, regularMonthly: 19 },
+  GBP: { monthly: 8, yearlyMonthly: 6.4, yearlyTotal: 76.8, regularMonthly: 25 },
 };

@@ -9,30 +9,33 @@ import {
 } from "@/app/(app)/settings/actions";
 import type { AccessState } from "@/lib/access";
 import {
-  PLAN_PRICING,
   type BillingInterval,
   type Currency,
+  type PlanPrice,
 } from "@/lib/constants";
-import { formatPrice, planPrice, yearlyTotal } from "@/lib/pricing";
+import { formatPrice, planPrice } from "@/lib/pricing";
 import { Card, GhostButton, PrimaryButton } from "./ui";
 
 export function BillingSection({
   access,
   symbol,
   currency,
+  plan,
+  planName,
   hasSubscription,
 }: {
   access: AccessState;
   symbol: string;
   currency: Currency;
+  plan: PlanPrice;
+  planName: string;
   hasSubscription: boolean;
 }) {
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [interval, setInterval] = useState<BillingInterval>("monthly");
 
-  const plan = PLAN_PRICING[currency];
-  const early = planPrice(currency, interval);
-  const annual = yearlyTotal(currency);
+  const early = planPrice(plan, interval);
+  const annual = plan.yearlyTotal;
 
   // A trialing workspace already has a Stripe subscription (card captured), so
   // it uses the same manage/cancel controls as a paid one.
@@ -45,7 +48,7 @@ export function BillingSection({
           {managed ? (
             <>
               <div className="flex items-center gap-2">
-                <span className="text-[18px] font-bold text-ink">Early adopter</span>
+                <span className="text-[18px] font-bold text-ink">{planName}</span>
                 <span className="inline-flex items-center gap-1 rounded-full bg-gold-tint px-2.5 py-0.5 text-[11px] font-semibold text-gold">
                   <SealCheck size={13} weight="fill" /> Founding price
                 </span>

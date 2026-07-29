@@ -18,5 +18,5 @@
   //
   // Runtime secrets (`wrangler secret put` or the dashboard):
   //   SUPABASE_SECRET_KEY, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET,
-  //   STRIPE_PRICE_{AUD,USD,GBP}_{MONTHLY,YEARLY}
+  //   STRIPE_PRODUCT_ID
 }
