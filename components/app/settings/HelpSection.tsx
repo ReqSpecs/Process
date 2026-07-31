@@ -1,13 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowSquareOut, CaretDown, ChatCircle, Lightbulb } from "@phosphor-icons/react";
+import { CaretDown, ChatCircle, Lightbulb } from "@phosphor-icons/react";
 import { FeedbackModal } from "@/components/app/FeedbackModal";
 import { HELP_TOPICS } from "@/lib/ui/settings";
+import { SUPPORT_EMAIL } from "@/lib/support";
 import { Card } from "./ui";
-
-const SUPPORT_EMAIL = "support@prodraw.app";
-const ROADMAP_URL = "https://prodraw.app/roadmap";
 
 export function HelpSection() {
   const [feedbackOpen, setFeedbackOpen] = useState(false);
@@ -61,18 +59,6 @@ export function HelpSection() {
               <p className="text-[12.5px] text-ink-faint">Tell us what you need</p>
             </div>
           </button>
-          <a
-            href={ROADMAP_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-3 rounded-xl border border-hairline bg-surface p-4 transition-colors hover:border-ink-faint"
-          >
-            <ArrowSquareOut size={20} weight="bold" className="text-ink-soft" />
-            <div>
-              <p className="text-[13.5px] font-semibold text-ink">Roadmap</p>
-              <p className="text-[12.5px] text-ink-faint">See what&apos;s coming</p>
-            </div>
-          </a>
         </div>
       </Card>
 

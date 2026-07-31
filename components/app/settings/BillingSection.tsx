@@ -43,9 +43,27 @@ export function BillingSection({
 
   return (
     <div className="space-y-5">
-      <Card title="Plan" desc="Your ProDraw subscription.">
+      <Card
+        title="Plan"
+        desc={
+          access.isFreePlan ? "Your ProDraw access." : "Your ProDraw subscription."
+        }
+      >
         <div className="py-4">
-          {managed ? (
+          {access.isFreePlan ? (
+            <>
+              <div className="flex items-center gap-2">
+                <span className="text-[18px] font-bold text-ink">Free</span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-gold-tint px-2.5 py-0.5 text-[11px] font-semibold text-gold">
+                  <SealCheck size={13} weight="fill" /> Complimentary
+                </span>
+              </div>
+              <p className="mt-1 text-[14px] text-ink-soft">
+                Full access, on us — no card, and nothing to pay. There&apos;s
+                nothing to manage here.
+              </p>
+            </>
+          ) : managed ? (
             <>
               <div className="flex items-center gap-2">
                 <span className="text-[18px] font-bold text-ink">{planName}</span>

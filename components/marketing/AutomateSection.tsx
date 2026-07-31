@@ -64,12 +64,23 @@ export function AutomateSection() {
           <span style={{ color: PINK }}>.</span>
         </span>
       }
+      sticker={
+        SHOW_STICKER && (
+          <Image
+            src="/features/coming-soon-automate.png"
+            alt="Coming soon"
+            width={1024}
+            height={576}
+            className="pointer-events-none mt-3 w-36 -rotate-2 select-none sm:hidden"
+          />
+        )
+      }
       subhead="Describe a process in plain English, refine it in a sentence, and let AI translate the busywork into clean BPMN 2.0."
     >
       <div className="space-y-4">
         {/* capability list on the left, chat mock on the right */}
         <div className="grid grid-cols-1 items-center gap-6 lg:grid-cols-2 lg:gap-8">
-          <ul className="space-y-4">
+          <ul className="min-w-0 space-y-4">
             {CAPABILITIES.map((c) => (
               <li key={c.title} className="flex gap-3.5">
                 <div className="relative h-12 w-12 shrink-0">
@@ -92,7 +103,7 @@ export function AutomateSection() {
             ))}
           </ul>
 
-          <div className="relative">
+          <div className="relative min-w-0">
             {SHOW_STICKER && (
               <Image
                 src="/features/coming-soon-automate.png"

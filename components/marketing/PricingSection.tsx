@@ -43,7 +43,7 @@ export function PricingTable({
     <section className="relative overflow-x-clip bg-surface px-5 py-14 sm:px-8 sm:py-20">
       <div className="relative mx-auto max-w-6xl">
         {/* heading — big, left-aligned, full stop */}
-        <h1 className="whitespace-nowrap font-[family-name:var(--font-inter)] text-[clamp(28px,4.6vw,64px)] font-bold leading-[1.06] tracking-[-0.025em] text-ink">
+        <h1 className="font-[family-name:var(--font-inter)] text-[clamp(28px,4.6vw,64px)] font-bold leading-[1.06] tracking-[-0.025em] text-ink sm:whitespace-nowrap">
           One home for all process
           <span className="text-[#aef029]">.</span>
         </h1>
@@ -109,9 +109,12 @@ export function PricingTable({
         <div className="relative mt-5">
           <div className="grid items-stretch gap-5 lg:grid-cols-2">
             {/* Early Adopter */}
-            <article className="relative flex h-full flex-col overflow-visible rounded-2xl border border-hairline bg-surface p-7 sm:p-9">
+            <article className="relative flex h-full min-w-0 flex-col overflow-visible rounded-2xl border border-hairline bg-surface p-7 sm:p-9">
+              {/* Hidden on phones: the cluster is 220px wide against a ~280px
+                  card interior, and the space it reserves squeezes the heading
+                  into a column too narrow to set. */}
               <div
-                className="pointer-events-none absolute -right-4 top-5 z-20 h-[175px] w-[220px] sm:-right-5 sm:top-6 sm:h-[195px] sm:w-[250px]"
+                className="pointer-events-none absolute -right-4 top-5 z-20 hidden h-[175px] w-[220px] sm:-right-5 sm:top-6 sm:block sm:h-[195px] sm:w-[250px]"
                 aria-hidden="true"
               >
                 <Image
@@ -140,9 +143,9 @@ export function PricingTable({
                 />
               </div>
 
-              <h2 className="min-h-[calc(1.15em*2)] pr-[9.5rem] text-[28px] font-bold leading-[1.15] tracking-[-0.02em] text-ink sm:pr-[11rem] sm:text-[32px]">
-                <span className="block whitespace-nowrap">Essentials for</span>
-                <span className="block whitespace-nowrap">
+              <h2 className="min-h-[calc(1.15em*2)] text-[26px] font-bold leading-[1.15] tracking-[-0.02em] text-ink sm:pr-[11rem] sm:text-[32px]">
+                <span className="block sm:whitespace-nowrap">Essentials for</span>
+                <span className="block sm:whitespace-nowrap">
                   organizing process.
                 </span>
               </h2>
@@ -203,10 +206,10 @@ export function PricingTable({
             </article>
 
             {/* Enterprise */}
-            <article className="relative flex h-full flex-col rounded-2xl bg-[#f2f9ff] p-7 sm:p-9">
-              <h2 className="min-h-[calc(1.15em*2)] text-[28px] font-bold leading-[1.15] tracking-[-0.02em] text-ink sm:text-[32px]">
-                <span className="block whitespace-nowrap">Run your whole</span>
-                <span className="block whitespace-nowrap">organization.</span>
+            <article className="relative flex h-full min-w-0 flex-col rounded-2xl bg-[#f2f9ff] p-7 sm:p-9">
+              <h2 className="min-h-[calc(1.15em*2)] text-[26px] font-bold leading-[1.15] tracking-[-0.02em] text-ink sm:text-[32px]">
+                <span className="block sm:whitespace-nowrap">Run your whole</span>
+                <span className="block sm:whitespace-nowrap">organization.</span>
               </h2>
 
               <div className="mt-9 flex min-h-[34px] items-center gap-2.5">

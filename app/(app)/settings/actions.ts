@@ -12,6 +12,7 @@ import {
   resolveCurrency,
 } from "@/lib/pricing";
 import { stripePriceId } from "@/lib/planCatalog";
+import { fullName } from "@/lib/onboarding";
 import { resolveSettings, type WorkspaceSettings } from "@/lib/ui/settings";
 import type { Workspace } from "@/lib/access";
 import type { BillingInterval, Currency } from "@/lib/constants";
@@ -34,7 +35,7 @@ async function getWorkspaceOrRedirect() {
 }
 
 export async function startCheckout(formData?: FormData) {
-  const { supabase, workspace, user } = await getWorkspaceOrRedirect();
+  const { workspace, user } = await getWorkspaceOrRedirect();
   const stripe = getStripe();
   const baseUrl = siteUrl();
 
@@ -59,10 +60,15 @@ export async function startCheckout(formData?: FormData) {
   if (!customerId) {
     const customer = await stripe.customers.create({
       email: user.email ?? undefined,
+      // Named customers are the difference between a readable Stripe dashboard
+      // and a list of anonymous email addresses.
+      name: fullName(user) || undefined,
       metadata: { workspace_id: workspace.id },
     });
     customerId = customer.id;
-    await supabase
+    // Service key: billing columns aren't writable by the user's own client, so
+    // nobody can hand themselves a subscription status or a free plan.
+    await createServiceClient()
       .from("workspaces")
       .update({ stripe_customer_id: customerId, currency })
       .eq("id", workspace.id);
@@ -120,8 +126,17 @@ export async function cancelSubscription() {
 
 export async function updateAccountName(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
-  const supabase = await createClient();
+  const { supabase, workspace } = await getWorkspaceOrRedirect();
   await supabase.auth.updateUser({ data: { full_name: name } });
+
+  if (name && workspace.stripe_customer_id) {
+    // Best effort by design: renaming yourself must not fail because Stripe is
+    // unreachable. The next checkout would reconcile it anyway.
+    try {
+      await getStripe().customers.update(workspace.stripe_customer_id, { name });
+    } catch {}
+  }
+
   revalidatePath("/settings");
 }
 

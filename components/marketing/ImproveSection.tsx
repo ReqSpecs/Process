@@ -45,15 +45,29 @@ export function ImproveSection() {
           <span style={{ color: MIAMI }}>.</span>
         </span>
       }
+      sticker={
+        SHOW_STICKER && (
+          <Image
+            src="/features/coming-soon-script.png"
+            alt="Coming soon"
+            width={1024}
+            height={576}
+            className="pointer-events-none mt-3 w-36 -rotate-2 select-none sm:hidden"
+          />
+        )
+      }
       subhead="Let AI review your processes for missing paths, weak controls and duplicated work, then suggest exactly how to tighten them up."
     >
       {/* mock on the left, 2x2 tile grid (aligned to mock height) on the right */}
+      {/* min-w-0 on every child: a grid item won't shrink below its content's
+          min-content width by default, which sizes the single mobile column to
+          the mock and pushes the whole section past the screen edge. */}
       <div className="grid gap-x-5 gap-y-3 lg:grid-cols-12 lg:items-stretch">
-        <div className="lg:col-span-8 lg:row-span-1">
+        <div className="min-w-0 lg:col-span-8 lg:row-span-1">
           <ImproveMock />
         </div>
 
-        <div className="relative grid grid-cols-1 gap-3 sm:grid-cols-2 lg:col-span-4 lg:row-span-1 lg:grid-rows-2">
+        <div className="relative grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:col-span-4 lg:row-span-1 lg:grid-rows-2">
           {SHOW_STICKER && (
             <Image
               src="/features/coming-soon-script.png"
@@ -96,7 +110,7 @@ export function ImproveSection() {
           ))}
         </div>
 
-        <p className="text-[11px] leading-relaxed text-ink-faint lg:col-span-8">
+        <p className="min-w-0 text-[11px] leading-relaxed text-ink-faint lg:col-span-8">
           Improve is on our roadmap. Features shown are in active development and
           may change before release.
         </p>

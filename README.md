@@ -44,7 +44,7 @@ Supabase project.
    Configure custom SMTP before real traffic.
 5. In **Auth → Email Templates**, add `{{ .Token }}` to both **Confirm signup**
    and **Magic Link**. Supabase sends the first template to new addresses and
-   the second to returning ones, and neither includes the 6-digit code by
+   the second to returning ones, and neither includes the numeric code by
    default — without this the form asks for a code the email never shows:
 
    ```html
@@ -133,9 +133,14 @@ Cloudflare supplies the `cf-ipcountry` header used for currency detection.
   address gets an emailed code, and an unknown address gets a code only when it
   came from the signup form — logging in with an unknown address says so rather
   than quietly creating an account.
-- The emailed **6-digit code** is the primary path, entered in the tab the user
-  started in. The same email also carries a magic link, which lands on
-  `/auth/callback` for anyone who prefers clicking.
+- The emailed **numeric code** is the only email path, entered in the tab the user
+  started in — the templates in `supabase/templates/` carry the code and no link,
+  so there's one flow to keep working rather than two. `/auth/callback` still
+  handles Google and Microsoft sign-in.
+- The code's length is Supabase's **Email OTP Length** setting (6 to 10), so
+  nothing in the UI states a digit count or caps the input below the maximum. A
+  cap that's too short truncates the code as it's typed and the failure looks
+  like a rejected code.
 - `/welcome` collects a display name and, for code-only accounts, an optional
   password so the next sign-in skips the inbox entirely.
 - Signup auto-creates an **incomplete** workspace (no trial yet). The user is

@@ -3,8 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getAccessState, type Workspace } from "@/lib/access";
+import { sessionUser, sessionWorkspace } from "@/lib/session";
+import { getAccessState } from "@/lib/access";
 import { defaultDiagramXml } from "@/lib/bpmn/defaultDiagram";
+import { sendFeedbackEmail } from "@/lib/email";
+import { fullName } from "@/lib/onboarding";
 import { projectSlug } from "@/lib/slug";
 import { STAGE_COLOR_ORDER } from "@/lib/types";
 import { resolveSettings } from "@/lib/ui/settings";
@@ -14,19 +17,27 @@ import { resolveSettings } from "@/lib/ui/settings";
 const PROJECT_ROUTE = "/project/[slug]";
 const LIBRARY_ROUTE = "/process-library";
 
+const UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Creates let the client pick the new row's id, so the row it renders
+ * immediately *is* the stored row and nothing has to be swapped out when the
+ * revalidated data lands. Spread into the insert; anything that isn't a UUID
+ * falls back to the column default.
+ */
+function requestedId(formData: FormData): { id?: string } {
+  const id = String(formData.get("clientId") ?? "");
+  return UUID.test(id) ? { id } : {};
+}
+
 async function requireEditableWorkspace() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const [supabase, user, workspace] = await Promise.all([
+    createClient(),
+    sessionUser(),
+    sessionWorkspace(),
+  ]);
   if (!user) redirect("/login");
-
-  const { data: workspace } = await supabase
-    .from("workspaces")
-    .select("*")
-    .eq("owner_id", user.id)
-    .single<Workspace>();
-
   if (!workspace) redirect("/login");
 
   const access = getAccessState(workspace);
@@ -160,12 +171,17 @@ export async function createStage(formData: FormData) {
   const nextOrder = (existing?.[0]?.sort_order ?? -1) + 1;
 
   await supabase.from("architecture_stages").insert({
+    ...requestedId(formData),
     project_id: projectId,
     name,
     color: STAGE_COLOR_ORDER[count % STAGE_COLOR_ORDER.length],
     sort_order: nextOrder,
   });
-  revalidatePath(PROJECT_ROUTE, "page");
+  // No revalidate, for the same reason the reorder actions skip it: the board
+  // already shows this row, so a refetch can only take a second to replace it
+  // with something identical — or, if an earlier action's response lands first,
+  // briefly with nothing at all. Other routes are dynamic and refetch on
+  // navigation anyway.
 }
 
 export async function updateStage(formData: FormData) {
@@ -177,7 +193,8 @@ export async function updateStage(formData: FormData) {
 
   const { supabase } = await requireEditableWorkspace();
   await supabase.from("architecture_stages").update({ name, color }).eq("id", id);
-  revalidatePath(PROJECT_ROUTE, "page");
+  // No revalidate: the board already shows the new name and colour. See
+  // createStage.
 }
 
 export async function moveStage(formData: FormData) {
@@ -238,26 +255,21 @@ export async function createProcess(formData: FormData) {
 
   const { supabase, workspace } = await requireEditableWorkspace();
   const docStatus = resolveSettings(workspace.settings).defaults.processStatus;
-  const { data, error } = await supabase
-    .from("processes")
-    .insert({
-      project_id: projectId,
-      stage_id: stageId,
-      parent_id: parentId,
-      is_group: isGroup,
-      name,
-      bpmn_xml: isGroup
-        ? ""
-        : defaultDiagramXml({ borderWeight, connectorWeight, cornerStyle }),
-      doc_status: docStatus,
-    })
-    .select("id")
-    .single();
+  await supabase.from("processes").insert({
+    ...requestedId(formData),
+    project_id: projectId,
+    stage_id: stageId,
+    parent_id: parentId,
+    is_group: isGroup,
+    name,
+    bpmn_xml: isGroup
+      ? ""
+      : defaultDiagramXml({ borderWeight, connectorWeight, cornerStyle }),
+    doc_status: docStatus,
+  });
 
-  if (error || !data) return;
-
-  revalidatePath(PROJECT_ROUTE, "page");
-  revalidatePath(LIBRARY_ROUTE);
+  // No revalidate — see createStage. The board renders this row itself, and any
+  // revalidate at all, even of another path, refetches the current route.
 }
 
 export async function renameProcess(formData: FormData) {
@@ -384,16 +396,26 @@ export async function reorderProcesses(formData: FormData) {
 
 // ---------- feedback ----------
 
-export async function submitFeedback(formData: FormData) {
+/**
+ * Records feedback and emails it out.
+ *
+ * The row and the email are independent on purpose: the table is the durable
+ * record, the email is what actually gets read. Reporting success when only one
+ * of them lands is honest — the message reached us either way — but reporting
+ * success when both fail would lose someone's bug report silently.
+ */
+export async function submitFeedback(
+  formData: FormData
+): Promise<{ ok: boolean }> {
   const category = String(formData.get("category") ?? "feature");
   const message = String(formData.get("message") ?? "").trim();
-  if (!message) return;
+  if (!message) return { ok: false };
 
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return;
+  if (!user) return { ok: false };
 
   const { data: workspace } = await supabase
     .from("workspaces")
@@ -401,10 +423,28 @@ export async function submitFeedback(formData: FormData) {
     .eq("owner_id", user.id)
     .maybeSingle();
 
-  await supabase.from("feedback").insert({
-    user_id: user.id,
-    workspace_id: workspace?.id ?? null,
-    category,
-    message,
-  });
+  const workspaceId = workspace?.id ?? null;
+
+  const [insert, emailed] = await Promise.all([
+    supabase.from("feedback").insert({
+      user_id: user.id,
+      workspace_id: workspaceId,
+      category,
+      message,
+    }),
+    sendFeedbackEmail({
+      category,
+      message,
+      fromName: fullName(user),
+      fromEmail: user.email ?? "",
+      userId: user.id,
+      workspaceId,
+    }),
+  ]);
+
+  if (insert.error) {
+    console.error("[feedback] insert failed", insert.error);
+  }
+
+  return { ok: emailed || !insert.error };
 }

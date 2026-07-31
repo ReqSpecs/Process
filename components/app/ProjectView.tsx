@@ -58,6 +58,9 @@ import {
 } from "@/lib/ui/projectStyle";
 import { projectSlug } from "@/lib/slug";
 import { readDiagramPrefs } from "@/lib/bpmn/diagramPrefs";
+// The list createStage assigns colours from — shared so an optimistic chevron
+// can't be given a different colour than the one about to be stored.
+import { STAGE_COLOR_ORDER } from "@/lib/types";
 import type {
   ArchitectureStage,
   ProcessRow,
@@ -135,19 +138,146 @@ function nextColor(color: StageColor): StageColor {
 }
 
 // Submit an inline create/edit form on blur. Empty values close instead of
-// creating blanks, and a per-form flag stops blur + Enter from double-submitting.
+// creating blanks. Deduplication lives in guardInlineSubmit, so every route into
+// the form — blur, Enter, or the button — is counted the same way.
 function submitInlineOnBlur(
   e: React.FocusEvent<HTMLInputElement>,
   onEmpty: () => void,
 ) {
-  const form = e.currentTarget.form;
   if (!e.currentTarget.value.trim()) {
     onEmpty();
     return;
   }
-  if (form?.dataset.submitted === "1") return;
-  if (form) form.dataset.submitted = "1";
-  form?.requestSubmit();
+  e.currentTarget.form?.requestSubmit();
+}
+
+/**
+ * First submit wins; anything after it is a duplicate.
+ *
+ * Clicking the submit button blurs the input first, so the blur handler submits
+ * and then the click submits the same form again a few milliseconds later —
+ * which inserts two rows. React skips a form action when the submit event is
+ * already default-prevented, so cancelling here is enough to drop the second.
+ */
+function guardInlineSubmit(e: React.FormEvent<HTMLFormElement>): void {
+  const form = e.currentTarget;
+  if (form.dataset.submitted === "1") {
+    e.preventDefault();
+    return;
+  }
+  form.dataset.submitted = "1";
+}
+
+/* ------------------------------------------------------- optimistic creates */
+
+/*
+ * Creating anything costs a round trip to the server action plus a route
+ * revalidation — well over a second. Rather than watch a spinner, we render the
+ * new row straight away and let the server catch up. The client mints the id and
+ * sends it along, so when the revalidated data arrives it contains this exact
+ * row and React reconciles it away to nothing.
+ *
+ * Fields the board doesn't read (the diagram XML, doc status, owner) are left at
+ * placeholder values; the real ones come back with the revalidation.
+ */
+
+function optimisticStage(
+  id: string,
+  projectId: string,
+  name: string,
+  existing: ArchitectureStage[],
+): ArchitectureStage {
+  const now = new Date().toISOString();
+  return {
+    id,
+    project_id: projectId,
+    name,
+    // Same formulas as createStage, so the chevron never changes under them.
+    color: STAGE_COLOR_ORDER[existing.length % STAGE_COLOR_ORDER.length],
+    sort_order: existing.reduce((max, s) => Math.max(max, s.sort_order), -1) + 1,
+    created_at: now,
+    updated_at: now,
+  };
+}
+
+function optimisticProcess(
+  id: string,
+  projectId: string,
+  stageId: string | null,
+  parentId: string | null,
+  isGroup: boolean,
+  name: string,
+): ProcessRow {
+  const now = new Date().toISOString();
+  return {
+    id,
+    project_id: projectId,
+    stage_id: stageId,
+    parent_id: parentId,
+    is_group: isGroup,
+    name,
+    bpmn_xml: "",
+    doc_owner: "",
+    doc_status: "draft",
+    doc_inputs: "",
+    doc_outputs: "",
+    doc_systems: "",
+    doc_risks: "",
+    doc_notes: "",
+    // createProcess leaves sort_order at its default, so new rows tie and fall
+    // back to created_at — which puts this one last, where it was just added.
+    sort_order: 0,
+    created_at: now,
+    updated_at: now,
+  };
+}
+
+/** Lets the process/group forms, nested deep in the board, seed a new row. */
+const AddProcessCtx = createContext<AddRow<ProcessRow>>(() => {});
+
+type AddRow<T> = (row: T, done: Promise<unknown>) => void;
+
+/**
+ * Server rows, with rows we've just created layered on top until the server
+ * confirms them.
+ *
+ * The layering isn't optional. Next runs server actions one at a time, so
+ * creating two things in quick succession means the first one's revalidated data
+ * arrives *after* the second row was added and doesn't contain it — a plain
+ * "server data wins" sync would blink the new row off the board for a second,
+ * which looks far more broken than the delay we're removing.
+ *
+ * A pending row is dropped once the server sends it back, or once its own insert
+ * has finished and the next batch of data still doesn't have it — which means the
+ * insert failed and the row was never real.
+ */
+function useCreatedRows<T extends { id: string }>(serverRows: T[]) {
+  const [rows, setRows] = useState<T[]>(serverRows);
+  const pending = useRef(new Map<string, { row: T; settled: boolean }>());
+
+  useEffect(() => {
+    const known = new Set(serverRows.map((r) => r.id));
+    for (const [id, p] of pending.current) {
+      if (known.has(id) || p.settled) pending.current.delete(id);
+    }
+    setRows([
+      ...serverRows,
+      ...Array.from(pending.current.values(), (p) => p.row),
+    ]);
+  }, [serverRows]);
+
+  const add = useCallback<AddRow<T>>((row, done) => {
+    pending.current.set(row.id, { row, settled: false });
+    setRows((prev) => [...prev, row]);
+    const settle = () => {
+      const p = pending.current.get(row.id);
+      if (p) p.settled = true;
+    };
+    // Both arms: a rejected insert has to stop protecting the row too.
+    void done.then(settle, settle);
+  }, []);
+
+  return { rows, setRows, add };
 }
 
 /* --------------------------------------------------------- drag context */
@@ -211,11 +341,17 @@ export function ProjectView({
     void updateProjectAppearance(fd);
   }
 
-  const [items, setItems] = useState<ProcessRow[]>(processes);
-  useEffect(() => setItems(processes), [processes]);
+  const {
+    rows: items,
+    setRows: setItems,
+    add: addProcess,
+  } = useCreatedRows(processes);
 
-  const [stageList, setStageList] = useState<ArchitectureStage[]>(stages);
-  useEffect(() => setStageList(stages), [stages]);
+  const {
+    rows: stageList,
+    setRows: setStageList,
+    add: addStage,
+  } = useCreatedRows(stages);
 
   const [view, setView] = useState<"modern" | "traditional">("modern");
   useEffect(() => {
@@ -535,6 +671,27 @@ export function ProjectView({
     void reorderStages(fd);
   }
 
+  /**
+   * Rename or recolour a chevron, on screen straight away.
+   *
+   * updateStage writes the name and the colour together, so whichever one isn't
+   * changing is sent back as it already is.
+   */
+  function changeStage(
+    stage: ArchitectureStage,
+    changes: Partial<Pick<ArchitectureStage, "name" | "color">>,
+  ) {
+    const next = { ...stage, ...changes };
+    setStageList((prev) => prev.map((s) => (s.id === stage.id ? next : s)));
+
+    const fd = new FormData();
+    fd.set("id", stage.id);
+    fd.set("projectId", project.id);
+    fd.set("name", next.name);
+    fd.set("color", next.color);
+    void updateStage(fd);
+  }
+
   // Empty chevrons carry no risk, so skip the type-to-confirm modal entirely.
   function deleteEmptyStage(id: string) {
     setStageList((prev) => prev.filter((s) => s.id !== id));
@@ -564,6 +721,7 @@ export function ProjectView({
   }
 
   return (
+    <AddProcessCtx.Provider value={addProcess}>
     <DragContext.Provider value={ctx}>
       <div
         className="flex min-h-0 flex-1 flex-col"
@@ -706,12 +864,17 @@ export function ProjectView({
           {addingStage ? (
             <form
               action={(fd) => {
-                createStage(fd);
                 setAddingStage(false);
+                const name = String(fd.get("name") ?? "").trim();
+                if (!name) return;
+                const id = crypto.randomUUID();
+                fd.set("clientId", id);
+                addStage(
+                  optimisticStage(id, project.id, name, stageList),
+                  createStage(fd),
+                );
               }}
-              onSubmit={(e) => {
-                e.currentTarget.dataset.submitted = "1";
-              }}
+              onSubmit={guardInlineSubmit}
               className="flex items-center gap-2"
             >
               <input type="hidden" name="projectId" value={project.id} />
@@ -758,6 +921,7 @@ export function ProjectView({
             onDelete={requestDelete}
             onReorderStages={reorderStageIds}
             onDeleteEmptyStage={deleteEmptyStage}
+            onChangeStage={changeStage}
           />
         )}
 
@@ -827,6 +991,7 @@ export function ProjectView({
         onDeleteMany={deleteMany}
       />
     </DragContext.Provider>
+    </AddProcessCtx.Provider>
   );
 }
 
@@ -845,6 +1010,7 @@ function Board({
   onDelete,
   onReorderStages,
   onDeleteEmptyStage,
+  onChangeStage,
 }: {
   view: "modern" | "traditional";
   stages: ArchitectureStage[];
@@ -854,6 +1020,10 @@ function Board({
   onDelete: (t: DeleteTarget) => void;
   onReorderStages: (ids: string[]) => void;
   onDeleteEmptyStage: (id: string) => void;
+  onChangeStage: (
+    stage: ArchitectureStage,
+    changes: Partial<Pick<ArchitectureStage, "name" | "color">>,
+  ) => void;
 }) {
   const [editing, setEditing] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
@@ -959,14 +1129,14 @@ function Board({
                   {editing === stage.id ? (
                     <form
                       action={(fd) => {
-                        updateStage(fd);
                         setEditing(null);
+                        const name = String(fd.get("name") ?? "").trim();
+                        if (name && name !== stage.name) {
+                          onChangeStage(stage, { name });
+                        }
                       }}
                       className="absolute inset-0 flex items-center px-5"
                     >
-                      <input type="hidden" name="id" value={stage.id} />
-                      <input type="hidden" name="projectId" value={projectId} />
-                      <input type="hidden" name="color" value={stage.color} />
                       <input
                         name="name"
                         defaultValue={stage.name}
@@ -992,10 +1162,12 @@ function Board({
 
                 <StageMenu
                   stage={stage}
-                  projectId={projectId}
                   open={isOpen}
                   onOpenChange={(o) => setMenuOpen(o ? stage.id : null)}
                   onRename={() => setEditing(stage.id)}
+                  onRecolor={() =>
+                    onChangeStage(stage, { color: nextColor(stage.color) })
+                  }
                   onDelete={() => {
                     const count = topItems(stage.id).length;
                     if (count === 0) {
@@ -1692,26 +1864,21 @@ function ProjectStatusButton({
 
 function StageMenu({
   stage,
-  projectId,
   open,
   onOpenChange,
   onRename,
+  onRecolor,
   onDelete,
 }: {
   stage: ArchitectureStage;
-  projectId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onRename: () => void;
+  onRecolor: () => void;
   onDelete: () => void;
 }) {
   function recolor() {
-    const fd = new FormData();
-    fd.set("id", stage.id);
-    fd.set("projectId", projectId);
-    fd.set("name", stage.name);
-    fd.set("color", nextColor(stage.color));
-    void updateStage(fd);
+    onRecolor();
     onOpenChange(false);
   }
 
@@ -1817,19 +1984,35 @@ function AddForm({
   placeholder: string;
   onClose: () => void;
 }) {
+  const addProcess = useContext(AddProcessCtx);
+
   return (
     <form
       action={(fd) => {
+        onClose();
+        const name = String(fd.get("name") ?? "").trim();
+        if (!name) return;
+
         const prefs = readDiagramPrefs(projectId);
         fd.set("borderWeight", prefs.border);
         fd.set("connectorWeight", prefs.connector);
         fd.set("cornerStyle", prefs.corner);
-        createProcess(fd);
-        onClose();
+
+        const id = crypto.randomUUID();
+        fd.set("clientId", id);
+        addProcess(
+          optimisticProcess(
+            id,
+            projectId,
+            stageId,
+            parentId ?? null,
+            Boolean(isGroup),
+            name,
+          ),
+          createProcess(fd),
+        );
       }}
-      onSubmit={(e) => {
-        e.currentTarget.dataset.submitted = "1";
-      }}
+      onSubmit={guardInlineSubmit}
       className="mt-1.5"
     >
       <input type="hidden" name="projectId" value={projectId} />

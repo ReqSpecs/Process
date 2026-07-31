@@ -53,11 +53,16 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  // Do not run code between createServerClient and getUser() —
+  // Do not run code between createServerClient and the claims check —
   // it can cause random logouts.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  //
+  // This runs on every request, so it's the one auth call we most want to keep
+  // off the network. getClaims() verifies the token's signature locally when the
+  // project uses asymmetric signing keys; getUser() always asked the Auth server,
+  // which cost 200ms typically and once 5.2s under load. All we need here is
+  // whether there's a valid session, which the token itself can answer.
+  const { data } = await supabase.auth.getClaims();
+  const user = data?.claims ?? null;
 
   const isProtected = PROTECTED_PREFIXES.some((p) => path.startsWith(p));
 

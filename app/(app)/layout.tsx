@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getAccessState, needsTrialSetup, type Workspace } from "@/lib/access";
+import { getAccessState, needsTrialSetup } from "@/lib/access";
+import { sessionWorkspace } from "@/lib/session";
 import { needsOnboarding } from "@/lib/onboarding";
 import { Sidebar } from "@/components/app/Sidebar";
 import { ProcessNavProvider } from "@/components/app/ProcessNavContext";
@@ -18,17 +19,18 @@ export default async function AppLayout({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: workspace } = await supabase
-    .from("workspaces")
-    .select("*")
-    .eq("owner_id", user.id)
-    .single<Workspace>();
+  // The onboarding check reads auth.users through an RPC, so it's a round trip of
+  // its own — run it alongside the workspace lookup rather than after it.
+  const [workspace, onboarding] = await Promise.all([
+    sessionWorkspace(),
+    needsOnboarding(user),
+  ]);
 
   if (!workspace) redirect("/login");
 
   // Backstop for anyone who navigated straight here mid-signup. Order matches
   // the callback: finish the profile, then take a card, then let them in.
-  if (await needsOnboarding(user)) redirect("/welcome");
+  if (onboarding) redirect("/welcome");
   if (needsTrialSetup(workspace)) redirect("/start-trial");
 
   const { data: projects } = await supabase

@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { sessionWorkspace } from "@/lib/session";
 import { ProjectView } from "@/components/app/ProjectView";
 import { projectSlug } from "@/lib/slug";
 import type { ArchitectureStage, Project, ProcessRow } from "@/lib/types";
@@ -10,22 +11,17 @@ export default async function ProjectPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const { data: workspace } = await supabase
-    .from("workspaces")
-    .select("id")
-    .eq("owner_id", user.id)
-    .single();
+  const [supabase, workspace] = await Promise.all([
+    createClient(),
+    // Shared with the layout's lookup rather than repeating it.
+    sessionWorkspace(),
+  ]);
+  if (!workspace) redirect("/login");
 
   const { data: projects } = await supabase
     .from("projects")
     .select("*")
-    .eq("workspace_id", workspace?.id ?? "")
+    .eq("workspace_id", workspace.id)
     .returns<Project[]>();
 
   const project = (projects ?? []).find((p) => projectSlug(p.name) === slug);

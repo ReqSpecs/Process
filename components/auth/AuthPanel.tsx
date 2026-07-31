@@ -13,9 +13,27 @@ import {
   type AuthStep,
 } from "@/app/(auth)/actions";
 import { Field, FormError, SubmitButton } from "@/components/auth/AuthCard";
+import {
+  clearPendingAuth,
+  readPendingAuth,
+  writePendingAuth,
+} from "@/components/auth/pendingAuth";
 import { GoogleIcon, MicrosoftIcon } from "@/components/auth/ProviderIcons";
 
 const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+
+/**
+ * Mirrors "Minimum interval between emails being sent to same user" under
+ * Authentication → Emails → SMTP Settings, set to 15s for this project (the
+ * default is 60). It's separate from the ceilings on the Rate Limits page: those
+ * are project-wide or per-IP, this one is per recipient. Asking again inside the
+ * window gets refused, so the button is better disabled than hopeful — but keep
+ * this at or above the dashboard value, or the button re-enables into a failure.
+ */
+const RESEND_LOCK_SECONDS = 15;
+
+/** The longest code Supabase will issue, whatever the project is set to. */
+const CODE_MAX_LENGTH = 10;
 
 export type AuthMode = "login" | "signup";
 
@@ -67,6 +85,26 @@ export function AuthPanel({
   const [email, setEmail] = useState("");
   const [codeNext, setCodeNext] = useState(next);
   const [isReset, setIsReset] = useState(false);
+  const [resendIn, setResendIn] = useState(0);
+
+  // Pick up a sign-in that was interrupted — see pendingAuth. This has to run
+  // after hydration rather than as initial state, since the server has no way to
+  // know about it and the first client render must match what it sent.
+  useEffect(() => {
+    const pending = readPendingAuth();
+    if (!pending || pending.mode !== mode) return;
+    setEmail(pending.email);
+    setCodeNext(pending.codeNext);
+    setIsReset(pending.isReset);
+    setStep(pending.step);
+  }, [mode]);
+
+  // Remember it for as long as we're waiting on something from the user's inbox.
+  useEffect(() => {
+    if (step === "email") return;
+    writePendingAuth({ mode, next, step, email, codeNext, isReset });
+  }, [step, mode, next, email, codeNext, isReset]);
+
 
   const [emailState, emailAction, emailPending] = useActionState(
     continueWithEmail,
@@ -97,6 +135,16 @@ export function AuthPanel({
     if (resendState?.sent) setStep("code");
   }, [resendState]);
 
+  // A correct code redirects, so there's no moment afterwards in which to clean
+  // up — the record is dropped when the code is submitted and put back here if it
+  // turns out to be wrong. Otherwise the modal would reopen itself the next time
+  // this tab visited a marketing page.
+  useEffect(() => {
+    if (codeState?.error) {
+      writePendingAuth({ mode, next, step: "code", email, codeNext, isReset });
+    }
+  }, [codeState, mode, next, email, codeNext, isReset]);
+
   useEffect(() => {
     if (resetState?.sent) {
       setIsReset(true);
@@ -105,7 +153,31 @@ export function AuthPanel({
     }
   }, [resetState]);
 
+  /*
+   * Hold the resend for a minute after a code goes out.
+   *
+   * Two reasons, and the second is the one that bites: Supabase refuses a second
+   * code within 60 seconds, and sending one invalidates the code already in the
+   * inbox — so an eager resend leaves people typing a code that has just stopped
+   * working, and reads to them as "it expired instantly". Showing the wait is
+   * kinder than letting them spend it. Deliberately not started when a step is
+   * restored from a previous visit, since no code was sent just now.
+   */
+  useEffect(() => {
+    const justSent =
+      emailState?.step === "code" || resendState?.sent || resetState?.sent;
+    if (!justSent) return;
+
+    setResendIn(RESEND_LOCK_SECONDS);
+    const id = setInterval(
+      () => setResendIn((left) => Math.max(0, left - 1)),
+      1000
+    );
+    return () => clearInterval(id);
+  }, [emailState, resendState, resetState]);
+
   const backToEmail = () => {
+    clearPendingAuth();
     setStep("email");
     setIsReset(false);
     setCodeNext(next);
@@ -120,11 +192,17 @@ export function AuthPanel({
           subtitle={
             isReset
               ? `Enter the code we sent to ${email}, then choose a new password.`
-              : `We sent a 6-digit code to ${email}. It expires shortly.`
+              : `We sent a code to ${email}. It expires shortly.`
           }
         />
 
-        <form action={codeAction} className="space-y-4">
+        <form
+          action={(fd) => {
+            clearPendingAuth();
+            codeAction(fd);
+          }}
+          className="space-y-4"
+        >
           <FormError message={codeState?.error ?? resendState?.error} />
           <input type="hidden" name="email" value={email} />
           <input type="hidden" name="next" value={codeNext} />
@@ -133,8 +211,12 @@ export function AuthPanel({
             name="code"
             inputMode="numeric"
             autoComplete="one-time-code"
-            placeholder="123456"
-            maxLength={6}
+            placeholder="12345678"
+            // Supabase's Email OTP Length is a dashboard setting, currently 8 and
+            // allowed anywhere from 6 to 10. Cap at the maximum rather than the
+            // configured value: a cap that's too low silently truncates the code
+            // as it's typed, and the failure looks like a rejected code.
+            maxLength={CODE_MAX_LENGTH}
             autoFocus
             required
           />
@@ -146,8 +228,15 @@ export function AuthPanel({
           <form action={resendAction}>
             <input type="hidden" name="email" value={email} />
             <input type="hidden" name="next" value={codeNext} />
-            <TextButton type="submit" disabled={resendPending}>
-              {resendPending ? "Sending\u2026" : "Send a new code"}
+            <TextButton
+              type="submit"
+              disabled={resendPending || resendIn > 0}
+            >
+              {resendPending
+                ? "Sending\u2026"
+                : resendIn > 0
+                  ? `Send a new code in ${resendIn}s`
+                  : "Send a new code"}
             </TextButton>
           </form>
           <span aria-hidden="true">·</span>
@@ -194,8 +283,15 @@ export function AuthPanel({
           <form action={resendAction}>
             <input type="hidden" name="email" value={email} />
             <input type="hidden" name="next" value={next} />
-            <TextButton type="submit" disabled={resendPending}>
-              {resendPending ? "Sending\u2026" : "Email me a code instead"}
+            <TextButton
+              type="submit"
+              disabled={resendPending || resendIn > 0}
+            >
+              {resendPending
+                ? "Sending\u2026"
+                : resendIn > 0
+                  ? `Email me a code in ${resendIn}s`
+                  : "Email me a code instead"}
             </TextButton>
           </form>
           <TextButton type="button" onClick={backToEmail}>

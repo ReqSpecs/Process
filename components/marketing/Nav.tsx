@@ -40,18 +40,27 @@ export function Nav() {
           </div>
         </div>
 
-        <div className="relative z-10 flex items-center gap-3">
+        <div className="relative z-10 flex items-center gap-0.5 sm:gap-3">
+          {/* The centred links above are hidden on mobile, where there's no room
+              to centre anything. Pricing earns its place in the row; Product is
+              the logo. */}
+          <Link
+            href="/pricing"
+            className="rounded-lg px-2 py-2 text-[14px] font-medium text-ink transition-colors hover:bg-mist sm:hidden"
+          >
+            Pricing
+          </Link>
           <button
             type="button"
             onClick={() => auth.open("login")}
-            className="rounded-lg px-3 py-2 text-[15px] font-medium text-ink transition-colors hover:bg-mist"
+            className="rounded-lg px-2 py-2 text-[14px] font-medium text-ink transition-colors hover:bg-mist sm:px-3 sm:text-[15px]"
           >
             Log in
           </button>
           <button
             type="button"
             onClick={() => auth.open("signup", { next: "/start-trial" })}
-            className="rounded-lg bg-cobalt px-4 py-2 text-[15px] font-semibold text-white shadow-soft transition-colors hover:bg-cobalt-deep"
+            className="ml-1 rounded-lg bg-cobalt px-3 py-2 text-[14px] font-semibold text-white shadow-soft transition-colors hover:bg-cobalt-deep sm:ml-0 sm:px-4 sm:text-[15px]"
           >
             Start trial
           </button>

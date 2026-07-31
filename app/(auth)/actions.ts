@@ -38,6 +38,51 @@ function isUnreachable(reason: unknown): boolean {
   );
 }
 
+type MaybeAuthError = { code?: string; status?: number; message?: string } | null;
+
+/**
+ * Turn a Supabase auth failure into something true, and leave a trace.
+ *
+ * "That code is invalid or has expired" was covering several unrelated problems —
+ * a genuinely old code, a code that a later resend silently replaced, and the
+ * hourly cap on Supabase's built-in email service, which stops mail going out at
+ * all. They need different words, and the underlying code needs to reach the
+ * logs, because a message that fits every failure tells you nothing about any of
+ * them.
+ */
+function authFailure(
+  context: string,
+  error: MaybeAuthError,
+  fallback: string
+): string {
+  console.error(`[auth] ${context}`, {
+    code: error?.code,
+    status: error?.status,
+    message: error?.message,
+  });
+
+  if (isUnreachable(error)) return UNREACHABLE;
+
+  switch (error?.code) {
+    case "over_email_send_rate_limit":
+    case "over_request_rate_limit":
+      // Supabase's own message names the exact wait, so keep it.
+      return (
+        error.message ||
+        "Too many requests for now. Wait a minute, then try again."
+      );
+    case "otp_expired":
+      // Supabase returns this for a mistyped code as well as a stale one, so the
+      // message can't claim the code expired. Requesting a code also invalidates
+      // the previous one, and people reach for whichever email is already open.
+      return "That code didn't work. Check every digit against the most recent email — only the newest code is valid — or send yourself a new one.";
+    case "email_provider_disabled":
+      return "Email sign-in is switched off for this project.";
+    default:
+      return fallback;
+  }
+}
+
 /** Set the demo session cookie (dev-only, in-memory backend). */
 export async function enterDemo(next?: string): Promise<never> {
   const cookieStore = await cookies();
@@ -159,7 +204,7 @@ export async function signInWithProvider(formData: FormData) {
 }
 
 /**
- * Sends an email containing both a magic link and a 6-digit code. The code is
+ * Sends an email containing both a magic link and a numeric code. The code is
  * what survives corporate link scanners and lets people finish in the tab they
  * started in, rather than whichever device happened to open the mail.
  */
@@ -179,7 +224,7 @@ async function sendCode(
       },
     });
     if (error) {
-      return { error: isUnreachable(error) ? UNREACHABLE : error.message };
+      return { error: authFailure("send code", error, error.message) };
     }
   } catch (cause) {
     if (!isUnreachable(cause)) throw cause;
@@ -257,13 +302,16 @@ export async function signInWithPassword(
   redirect(await postAuthDestination(supabase, user, next));
 }
 
-/** Verify the 6-digit code from the sign-in email. */
+/** Verify the numeric code from the sign-in email. */
 export async function verifyEmailCode(
   _prev: AuthFormState,
   formData: FormData
 ): Promise<AuthFormState> {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  const token = String(formData.get("code") ?? "").replace(/\s/g, "");
+  // Codes get copied out of an email, so they arrive wearing whatever the mail
+  // client wrapped them in — spaces, a stray hyphen, a zero-width character that
+  // \s doesn't match. The code is always digits, so keep only those.
+  const token = String(formData.get("code") ?? "").replace(/\D/g, "");
   const next = String(formData.get("next") ?? "");
 
   if (!token) return { error: "Enter the code from your email." };
@@ -279,9 +327,11 @@ export async function verifyEmailCode(
     });
     if (error || !data.user) {
       return {
-        error: isUnreachable(error)
-          ? UNREACHABLE
-          : "That code is invalid or has expired. Request a new one.",
+        error: authFailure(
+          "verify code",
+          error,
+          "That code isn't right. Check the latest email and try again."
+        ),
       };
     }
     user = data.user;

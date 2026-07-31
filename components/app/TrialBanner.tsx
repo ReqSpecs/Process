@@ -2,6 +2,9 @@ import Link from "next/link";
 import type { AccessState } from "@/lib/access";
 
 export function TrialBanner({ access }: { access: AccessState }) {
+  // Nothing to warn a granted account about, and no trial clock to count down.
+  if (access.isFreePlan) return null;
+
   // A failed or stalled charge outranks everything else: it's the only state
   // the user can still fix before editing stops.
   if (access.billingAlert === "payment_failed") {

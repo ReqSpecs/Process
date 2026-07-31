@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { submitFeedback } from "@/app/(app)/actions";
+import { SUPPORT_EMAIL } from "@/lib/support";
 
 const CATEGORIES = [
   { value: "feature", label: "Feature idea" },
@@ -19,6 +20,7 @@ export function FeedbackModal({
   const [category, setCategory] = useState("feature");
   const [message, setMessage] = useState("");
   const [sent, setSent] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [pending, startTransition] = useTransition();
 
   if (!open) return null;
@@ -30,8 +32,11 @@ export function FeedbackModal({
     formData.set("category", category);
     formData.set("message", message);
     startTransition(async () => {
-      await submitFeedback(formData);
-      setSent(true);
+      const result = await submitFeedback(formData);
+      // Keep the text on screen when it didn't get through — thanking someone
+      // for a bug report that went nowhere is the worst of both outcomes.
+      if (result.ok) setSent(true);
+      else setFailed(true);
     });
   }
 
@@ -40,6 +45,7 @@ export function FeedbackModal({
     // reset after the close animation would finish
     setTimeout(() => {
       setSent(false);
+      setFailed(false);
       setMessage("");
       setCategory("feature");
     }, 300);
@@ -93,6 +99,16 @@ export function FeedbackModal({
                 </button>
               ))}
             </div>
+
+            {failed && (
+              <p className="mt-4 rounded-lg bg-ember-tint px-3 py-2 text-[13px] font-medium text-signal">
+                That didn&apos;t send. Try again, or email us at{" "}
+                <a href={`mailto:${SUPPORT_EMAIL}`} className="underline">
+                  {SUPPORT_EMAIL}
+                </a>
+                .
+              </p>
+            )}
 
             <textarea
               value={message}

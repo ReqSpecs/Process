@@ -6,6 +6,13 @@ type Props = {
   eyebrowColor?: string;
   comingSoon?: boolean;
   heading: ReactNode;
+  /**
+   * Hand-drawn "Coming soon" mark for roadmap sections. Only used on mobile,
+   * where the desktop placement (floating above the mock) sits below the fold
+   * and the reader gets halfway through a feature list before learning it
+   * doesn't exist yet.
+   */
+  sticker?: ReactNode;
   subhead?: string;
   bgClass?: string;
   headingWidthClass?: string;
@@ -26,6 +33,7 @@ export function SectionShell({
   eyebrowColor = "var(--color-cobalt)",
   comingSoon,
   heading,
+  sticker,
   subhead,
   bgClass = "bg-surface",
   headingWidthClass = "max-w-3xl",
@@ -58,6 +66,7 @@ export function SectionShell({
           <h2 className="font-display text-[34px] font-bold leading-[1.04] tracking-[-0.025em] text-ink sm:text-[52px]">
             {heading}
           </h2>
+          {sticker}
           {subhead && (
             <p
               className={`mt-5 text-lg leading-relaxed text-ink-soft ${subheadWidthClass}`}

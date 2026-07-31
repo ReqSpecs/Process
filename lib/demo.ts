@@ -144,6 +144,9 @@ function seed(): Store {
     id: "demo-ws",
     owner_id: DEMO_USER.id,
     name: "Acme Operations",
+    plan: "early_adopter",
+    owner_name: "Demo user",
+    owner_email: DEMO_EMAIL,
     trial_ends_at: daysFromNow(7),
     stripe_customer_id: null,
     stripe_subscription_id: null,
@@ -446,9 +449,16 @@ class DemoQuery<T = unknown> implements PromiseLike<QueryResult<T>> {
 
 type DemoAuthResult = { data: { user: typeof DEMO_USER }; error: null };
 
+type DemoClaimsResult = {
+  data: { claims: { sub: string; email: string } };
+  error: null;
+};
+
 type DemoClient = {
   auth: {
     getUser: () => Promise<DemoAuthResult>;
+    /** The demo has no tokens to verify, so it just answers with the fixture. */
+    getClaims: () => Promise<DemoClaimsResult>;
     /** Profile edits in Settings are accepted and discarded. */
     updateUser: () => Promise<DemoAuthResult>;
     signOut: () => Promise<{ error: null }>;
@@ -462,6 +472,11 @@ export function createDemoClient(): DemoClient {
   return {
     auth: {
       getUser: user,
+      getClaims: async () =>
+        ({
+          data: { claims: { sub: DEMO_USER.id, email: DEMO_USER.email } },
+          error: null,
+        }) as const,
       updateUser: user,
       signOut: async () => ({ error: null }),
     },

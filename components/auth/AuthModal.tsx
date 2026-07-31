@@ -12,6 +12,7 @@ import {
 import { X } from "@phosphor-icons/react";
 import { Wordmark } from "@/components/Wordmark";
 import { AuthPanel, type AuthMode } from "@/components/auth/AuthPanel";
+import { clearPendingAuth, readPendingAuth } from "@/components/auth/pendingAuth";
 
 type OpenOptions = { next?: string };
 
@@ -50,11 +51,22 @@ export function AuthModalProvider({
   }, []);
 
   const close = useCallback(() => {
+    // Closing is a decision, so don't offer to resume this one later.
+    clearPendingAuth();
     setState(null);
     restoreFocusTo.current?.focus?.();
   }, []);
 
   const value = useMemo(() => ({ open, close }), [open, close]);
+
+  // Reopen a sign-in that was waiting on an emailed code. Going to fetch the code
+  // can cost you the page — Chrome reloads tabs it discarded while backgrounded —
+  // and without this you'd come back to the marketing page with the code in your
+  // clipboard and nowhere to put it.
+  useEffect(() => {
+    const pending = readPendingAuth();
+    if (pending) setState({ mode: pending.mode, next: pending.next });
+  }, []);
 
   // Lock scroll while open, compensating for the scrollbar so the page behind
   // doesn't visibly shift sideways when the modal appears.
