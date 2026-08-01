@@ -1,8 +1,14 @@
 import Link from "next/link";
 import type { AccessState } from "@/lib/access";
 
+/**
+ * Only states the user has to act on. A running trial isn't one of them: the
+ * card is already on file, the charge is expected, and a permanent countdown
+ * reads as a nag to cancel. The pre-charge notice the card networks require is
+ * an email, sent from the trial_will_end webhook three days out.
+ */
 export function TrialBanner({ access }: { access: AccessState }) {
-  // Nothing to warn a granted account about, and no trial clock to count down.
+  // Nothing to warn a granted account about — no card, no charge coming.
   if (access.isFreePlan) return null;
 
   // A failed or stalled charge outranks everything else: it's the only state
@@ -25,8 +31,8 @@ export function TrialBanner({ access }: { access: AccessState }) {
     );
   }
 
-  if (access.isSubscribed) return null;
-
+  // Editing has stopped. This one has to stay: without it the app looks broken
+  // rather than locked.
   if (!access.canEdit) {
     return (
       <div className="flex items-center justify-center gap-3 border-b border-hairline bg-ember-tint px-4 py-2.5 text-[13px] font-medium text-ink">
@@ -41,23 +47,7 @@ export function TrialBanner({ access }: { access: AccessState }) {
     );
   }
 
-  const endingSoon = access.billingAlert === "trial_ending";
-
-  return (
-    <div className="flex items-center justify-center gap-3 border-b border-hairline bg-gold-tint px-4 py-2 text-[13px] font-medium text-ink">
-      {access.trialDaysLeft} day{access.trialDaysLeft === 1 ? "" : "s"} left in
-      your free trial
-      {endingSoon
-        ? " — your card will be charged automatically when it ends."
-        : " — cancel anytime before it ends."}
-      <Link
-        href="/settings?tab=billing"
-        className="font-semibold text-cobalt hover:underline"
-      >
-        Manage billing
-      </Link>
-    </div>
-  );
+  return null;
 }
 
 function AlertBar({ message, action }: { message: string; action: string }) {

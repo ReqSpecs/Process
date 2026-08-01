@@ -101,7 +101,7 @@ export function AuthPanel({
 
   // Remember it for as long as we're waiting on something from the user's inbox.
   useEffect(() => {
-    if (step === "email") return;
+    if (step !== "code") return;
     writePendingAuth({ mode, next, step, email, codeNext, isReset });
   }, [step, mode, next, email, codeNext, isReset]);
 
@@ -328,11 +328,11 @@ export function AuthPanel({
         <input type="hidden" name="next" value={next} />
         <input type="hidden" name="mode" value={mode} />
         <Field
-          label="Work email"
+          label="Email"
           name="email"
           type="email"
           autoComplete="email"
-          placeholder="you@company.com"
+          placeholder="you@example.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required

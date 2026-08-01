@@ -44,9 +44,10 @@ export default function TermsPage() {
               When the {TRIAL_DAYS} days are up, the subscription begins
               automatically and your card is charged
             </strong>{" "}
-            at the price shown when you signed up. To avoid that charge, cancel
-            before the trial ends — you can do it yourself in Settings. We show
-            a reminder in the app three days before it happens.
+            at the price shown when you signed up. We email you three days
+            beforehand with the date, the amount and a link to cancel. To avoid
+            the charge, cancel before the trial ends — you can do it yourself in
+            Settings.
           </p>
         </section>
         <section>

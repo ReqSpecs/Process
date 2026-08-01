@@ -28,8 +28,15 @@ const TTL_MS = 30 * 60 * 1000;
 export type PendingAuth = {
   mode: AuthMode;
   next: string;
-  /** Only the steps worth returning to — "email" is where you'd start anyway. */
-  step: "code" | "password";
+  /**
+   * The code step and nothing else. It's the only one that sends you out of the
+   * page to fetch something, so it's the only one worth restoring — and the
+   * password step actively shouldn't be, because a sign-in that succeeded from
+   * there leaves no moment to clean up, and the leftover record would reopen
+   * the modal on "Welcome back" the next time the tab saw a marketing page.
+   * Logging out lands on exactly such a page.
+   */
+  step: "code";
   email: string;
   codeNext: string;
   isReset: boolean;
@@ -43,7 +50,10 @@ export function readPendingAuth(): PendingAuth | null {
     if (!raw) return null;
 
     const { at, ...pending } = JSON.parse(raw) as Stored;
-    if (!pending.email || !at || Date.now() - at > TTL_MS) {
+    // The step check isn't only belt and braces: a tab open across a deploy can
+    // still be holding a record from when other steps were remembered too.
+    const stale = !at || Date.now() - at > TTL_MS;
+    if (!pending.email || pending.step !== "code" || stale) {
       sessionStorage.removeItem(KEY);
       return null;
     }

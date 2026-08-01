@@ -6,6 +6,7 @@ import { needsOnboarding } from "@/lib/onboarding";
 import { Sidebar } from "@/components/app/Sidebar";
 import { ProcessNavProvider } from "@/components/app/ProcessNavContext";
 import { TrialBanner } from "@/components/app/TrialBanner";
+import { ClearPendingAuth } from "@/components/auth/ClearPendingAuth";
 import type { Project } from "@/lib/types";
 
 export default async function AppLayout({
@@ -44,6 +45,7 @@ export default async function AppLayout({
 
   return (
     <ProcessNavProvider>
+      <ClearPendingAuth />
       <div className="flex h-screen overflow-hidden bg-surface">
         <Sidebar
           projects={projects ?? []}
