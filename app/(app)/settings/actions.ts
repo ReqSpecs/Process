@@ -83,7 +83,9 @@ export async function startCheckout(formData?: FormData) {
     customer: customerId,
     mode: "subscription",
     line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `${baseUrl}/process-library?checkout=success`,
+    // Not straight into the app: the webhook that marks this workspace as paid
+    // is still in flight, and /checkout/complete waits for it.
+    success_url: `${baseUrl}/checkout/complete${isFirstTrial ? "?trial=1" : ""}`,
     cancel_url: `${baseUrl}/settings?tab=billing&checkout=cancelled`,
     metadata: { workspace_id: workspace.id },
     // Always collect a payment method so day-8 billing succeeds.

@@ -49,8 +49,9 @@ export default function PrivacyPage() {
             To operate the service: signing you in, storing your work, sending
             the emails the service depends on (sign-in codes, billing notices),
             processing subscriptions, and answering the feedback you send us. We
-            do not sell your data, and we do not use it for advertising or to
-            train machine-learning models.
+            do not sell your data, and we never use what you write in ProDraw
+            for advertising or to train machine-learning models. We do measure
+            which ads bring people here — see Cookies and advertising below.
           </p>
         </section>
         <section>
@@ -67,16 +68,29 @@ export default function PrivacyPage() {
             <strong className="font-medium text-ink">Stripe</strong> processes
             payments; and{" "}
             <strong className="font-medium text-ink">Resend</strong> delivers
-            our email. They may process your data outside Australia. We share
-            your data with no one else.
+            our email; and <strong className="font-medium text-ink">Meta</strong>{" "}
+            receives the advertising measurement described below. They may
+            process your data outside Australia. We share your data with no one
+            else.
           </p>
         </section>
         <section>
-          <h2 className="mb-2 text-lg font-semibold text-ink">Cookies</h2>
+          <h2 className="mb-2 text-lg font-semibold text-ink">
+            Cookies and advertising
+          </h2>
           <p>
-            Essential cookies only — the session cookies that keep you logged
-            in. No analytics, tracking, or advertising cookies, and no
-            third-party trackers on the site.
+            Session cookies keep you logged in. Alongside those we run the{" "}
+            <strong className="font-medium text-ink">Meta pixel</strong>, so we
+            can tell which ads bring people to ProDraw. It records page views
+            and a single conversion event when a trial starts, and Meta may set
+            or read its own cookies to do that. It never receives the content of
+            your processes.
+          </p>
+          <p className="mt-3">
+            Any tracker-blocking extension will stop it, as will turning off
+            third-party cookies, and you can control what Meta does with the
+            data in your Meta ad preferences. Blocking it changes nothing about
+            how ProDraw works.
           </p>
         </section>
         <section>

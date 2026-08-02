@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { DEMO_COOKIE, isDemoMode } from "@/lib/demo";
 
 const PROTECTED_PREFIXES = [
+  "/checkout",
   "/process-library",
   "/project",
   "/projects",
