@@ -105,18 +105,18 @@ export function FoundingOfferPage({
 
             <div className="relative min-w-0">
               <OfferCard currency={currency} symbol={symbol} plan={plan} />
-              <Image
-                src="/doodles/offer-start.png"
-                alt=""
-                width={512}
-                height={512}
-                className="pointer-events-none absolute left-8 top-[calc(100%-12px)] hidden w-[168px] -rotate-[10deg] mix-blend-multiply lg:block"
-                aria-hidden="true"
-              />
             </div>
           </div>
 
           <div className="relative z-10 mt-3">
+            <Image
+              src="/doodles/offer-start.png"
+              alt=""
+              width={512}
+              height={512}
+              className="pointer-events-none absolute right-[4%] -top-8 z-0 hidden w-[168px] -rotate-[10deg] mix-blend-multiply lg:block"
+              aria-hidden="true"
+            />
             <Image
               src="/doodles/offer-task.png"
               alt=""
