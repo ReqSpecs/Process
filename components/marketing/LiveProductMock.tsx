@@ -20,6 +20,19 @@ import {
   Users,
   type Icon,
 } from "@phosphor-icons/react";
+import {
+  BpmnMockDefs,
+  EndEvent,
+  Gateway,
+  IntermediateEvent,
+  LINE,
+  PO_FLOW_FLOWS,
+  PO_FLOW_TASKS,
+  PO_FLOW_VIEWBOX,
+  StartEvent,
+  Task,
+  orthogonal,
+} from "@/components/marketing/offer/bpmnMockShapes";
 
 // Vibrant palette — mirrors the animated headline pill.
 const LIME = "#7a9e00"; // darker lime so it reads on white
@@ -101,9 +114,9 @@ const EXPANDED = new Set(["Identify Need", "Select Supplier", "Procure to Pay"])
 // Phase machine (ms). A = high-level, B = process map. Slower + readable.
 //  0 cursor pops in on PO · 1 rest · 2 click · 3 fade→B (build starts)
 //  4 flow finishes drawing · 5 hold B (read) · 6 fade→A · 7 hold A (read)
-const DURATIONS = [900, 550, 650, 1100, 2600, 3000, 1100, 1600];
+const DURATIONS = [900, 550, 650, 1100, 2900, 3000, 1100, 1600];
 
-export function LiveProductMock() {
+export function LiveProductMock({ className = "mx-auto max-w-5xl" }: { className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const [phase, setPhase] = useState(0);
   const [visible, setVisible] = useState(false);
@@ -144,7 +157,7 @@ export function LiveProductMock() {
   const cursorOn = phase <= 2; // visible only while acting on screen A
 
   return (
-    <div ref={ref} className="mx-auto max-w-5xl">
+    <div ref={ref} className={className}>
       <div className="relative overflow-hidden rounded-2xl border border-black/10 bg-surface shadow-float">
         {/* window chrome */}
         <div className="flex items-center gap-2 border-b border-black/[0.07] bg-mist/40 px-4 py-2.5">
@@ -347,7 +360,7 @@ function ScreenProcess({
       aria-hidden="true"
     >
       {/* grouped process tree */}
-      <aside className="w-[26%] shrink-0 overflow-hidden border-r border-black/[0.06] bg-paper/40 p-2.5">
+      <aside className="w-[22%] shrink-0 overflow-hidden border-r border-black/[0.06] bg-paper/40 p-2.5">
         <p className="px-1.5 pb-1.5 text-[11px] font-semibold tracking-wide text-ink-faint">
           Processes
         </p>
@@ -394,22 +407,27 @@ function ScreenProcess({
         </ul>
       </aside>
 
-      {/* canvas */}
+      {/* canvas — paper + 20px hairline dots, same as the in-app editor */}
       <div
-        className="relative flex-1"
+        className="relative flex-1 bg-paper"
         style={{
           backgroundImage:
-            "radial-gradient(rgba(18,36,77,0.10) 1px, transparent 1px)",
-          backgroundSize: "16px 16px",
+            "radial-gradient(circle, var(--color-hairline) 1px, transparent 1px)",
+          backgroundSize: "20px 20px",
         }}
       >
-        <BpmnFlow building={building} />
+        <div className="absolute inset-0 px-5 py-6 sm:px-8 sm:py-8">
+          <BpmnFlow building={building} />
+        </div>
       </div>
     </div>
   );
 }
 
-/** Monochrome navy BPMN flow that draws itself in sequence when `building`. */
+/** Same PO-approval diagram as the hero still, drawn in sequence when `building`. */
+const FLOW_DELAYS = [120, 500, 900, 1100, 900, 1100, 1500, 1500, 1900, 2050];
+const TASK_DELAYS = [300, 1150, 1150, 1850];
+
 function BpmnFlow({ building }: { building: boolean }) {
   const node = (delay: number) =>
     ({
@@ -428,96 +446,62 @@ function BpmnFlow({ building }: { building: boolean }) {
       transition: `stroke-dashoffset 0.45s ease ${delay}ms, opacity 0.01s linear ${building ? delay : 0}ms`,
     }) as React.CSSProperties;
 
-  const label: React.CSSProperties = { fill: NAVY, fontSize: 11, fontWeight: 600 };
-
   return (
     <svg
-      viewBox="0 0 640 300"
-      className="absolute inset-0 h-full w-full p-3"
-      style={{ color: NAVY }}
+      viewBox={PO_FLOW_VIEWBOX}
+      className="h-full w-full"
+      preserveAspectRatio="xMidYMid meet"
     >
-      <defs>
-        <marker
-          id="mk-arrow"
-          viewBox="0 0 10 10"
-          refX="10"
-          refY="5"
-          markerWidth="6.5"
-          markerHeight="6.5"
-          orient="auto-start-reverse"
-        >
-          <path d="M0 0 L10 5 L0 10 Z" fill={NAVY} />
-        </marker>
-      </defs>
+      <BpmnMockDefs prefix="lpm" />
 
-      <g fill="none" stroke={NAVY} strokeWidth="2" markerEnd="url(#mk-arrow)">
-        <path d="M56 150 H92" pathLength={1} style={edge(120)} />
-        <path d="M188 150 H226" pathLength={1} style={edge(500)} />
-        <path d="M258 128 V80 H366" pathLength={1} style={edge(900)} />
-        <path d="M258 172 V220 H366" pathLength={1} style={edge(900)} />
-        <path d="M494 80 H540 V119" pathLength={1} style={edge(1500)} />
-        <path d="M494 220 H540 V181" pathLength={1} style={edge(1500)} />
-        <path d="M571 150 H600" pathLength={1} style={edge(1900)} />
-      </g>
+      {PO_FLOW_FLOWS.map((points, i) => (
+        <path
+          key={i}
+          d={orthogonal(points)}
+          fill="none"
+          stroke={LINE}
+          strokeWidth="2"
+          markerEnd="url(#lpm-arrow)"
+          pathLength={1}
+          style={edge(FLOW_DELAYS[i] ?? 0)}
+        />
+      ))}
 
-      {/* Start */}
       <g style={node(0)}>
-        <circle cx="40" cy="150" r="16" fill="#fff" stroke={NAVY} strokeWidth="2" />
-      </g>
-      <text x="40" y="184" textAnchor="middle" style={label}>
-        Start
-      </text>
-
-      {/* Raise PO */}
-      <g style={node(300)}>
-        <rect x="92" y="126" width="96" height="48" rx="10" fill="#fff" stroke={NAVY} strokeWidth="2" />
-        <text x="140" y="154" textAnchor="middle" style={label}>
-          Raise PO
-        </text>
+        <StartEvent prefix="lpm" cx={60} cy={168} label="Requisition raised" />
       </g>
 
-      {/* Gateway 1 */}
+      {PO_FLOW_TASKS.map((task, i) => (
+        <g key={task.step} style={node(TASK_DELAYS[i] ?? 300)}>
+          <Task {...task} />
+        </g>
+      ))}
+
       <g style={node(650)}>
-        <rect x="234" y="126" width="48" height="48" rx="6" transform="rotate(45 258 150)" fill="#fff" stroke={NAVY} strokeWidth="2" />
-        <text x="258" y="155" textAnchor="middle" style={{ ...label, fontSize: 16, fontWeight: 700 }}>
-          X
-        </text>
+        <Gateway cx={283} cy={168} />
       </g>
-      <text x="258" y="196" textAnchor="middle" style={label}>
-        Approved?
-      </text>
-
-      {/* Send to Vendor */}
-      <g style={node(1050)}>
-        <rect x="366" y="56" width="128" height="48" rx="10" fill="#fff" stroke={NAVY} strokeWidth="2" />
-        <text x="430" y="84" textAnchor="middle" style={label}>
-          Send to Vendor
-        </text>
+      <g style={node(950)}>
+        <IntermediateEvent
+          cx={366}
+          cy={88}
+          lines={["PO Raised"]}
+          side="below"
+        />
       </g>
-
-      {/* Revise & Resubmit */}
-      <g style={node(1050)}>
-        <rect x="366" y="196" width="128" height="48" rx="10" fill="#fff" stroke={NAVY} strokeWidth="2" />
-        <text x="430" y="224" textAnchor="middle" style={label}>
-          Revise &amp; Resubmit
-        </text>
+      <g style={node(950)}>
+        <IntermediateEvent
+          cx={366}
+          cy={248}
+          lines={["Issue with PO", "Encountered"]}
+          side="below"
+        />
       </g>
-
-      {/* Gateway 2 (join) */}
       <g style={node(1650)}>
-        <rect x="516" y="126" width="48" height="48" rx="6" transform="rotate(45 540 150)" fill="#fff" stroke={NAVY} strokeWidth="2" />
-        <text x="540" y="155" textAnchor="middle" style={{ ...label, fontSize: 16, fontWeight: 700 }}>
-          X
-        </text>
+        <Gateway cx={589} cy={168} />
       </g>
-
-      {/* End */}
-      <g style={node(2050)}>
-        <circle cx="616" cy="150" r="16" fill="#fff" stroke={NAVY} strokeWidth="3.5" />
+      <g style={node(2150)}>
+        <EndEvent prefix="lpm" cx={812} cy={168} label="PO issued" />
       </g>
-      <text x="616" y="184" textAnchor="middle" style={label}>
-        End
-      </text>
     </svg>
   );
 }
