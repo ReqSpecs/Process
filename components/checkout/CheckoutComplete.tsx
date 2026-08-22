@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { subscriptionReady } from "@/app/checkout/complete/actions";
-import { fireStartTrialOnce } from "@/components/analytics/startTrialEvent";
+import { fireStartTrialOnce } from "@/components/analytics/metaEvents";
 
 /** Slow enough not to hammer the database, quick enough not to feel stuck. */
 const POLL_MS = 800;

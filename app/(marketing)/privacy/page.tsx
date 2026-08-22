@@ -81,10 +81,11 @@ export default function PrivacyPage() {
           <p>
             Session cookies keep you logged in. Alongside those we run the{" "}
             <strong className="font-medium text-ink">Meta pixel</strong>, so we
-            can tell which ads bring people to ProDraw. It records page views
-            and a single conversion event when a trial starts, and Meta may set
-            or read its own cookies to do that. It never receives the content of
-            your processes.
+            can tell which ads bring people to ProDraw. It records page views,
+            and one conversion event when you create an account and another when
+            a trial starts. Meta may set or read its own cookies to do that. It
+            never receives your name, your email address, or the content of your
+            processes.
           </p>
           <p className="mt-3">
             Any tracker-blocking extension will stop it, as will turning off

@@ -38,6 +38,8 @@ Supabase project.
    - `0007_card_required_trial.sql` — trial only starts after Stripe checkout
    - `0008`–`0009` — `email_account_state()` lookup behind the sign-in form
    - `0010_billing_alert.sql` — surfaces failed/stalled charges in the app
+   - `0011_free_plan_and_profiles.sql` — comped plans + queryable `profiles`
+   - `0012_signup_conversion.sql` — reports a signup to Meta exactly once
 3. In **Auth → URL Configuration**: set the Site URL and add
    `<your-site>/auth/callback` to the redirect allowlist.
 4. In **Auth → Providers → Email**: enable the provider and magic-link sign-in.

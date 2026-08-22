@@ -2,6 +2,8 @@ import type { User } from "@supabase/supabase-js";
 import type { createClient } from "@/lib/supabase/server";
 import { needsTrialSetup, type Workspace } from "@/lib/access";
 import { needsOnboarding } from "@/lib/onboarding";
+import { claimSignupConversion } from "@/lib/signupConversion";
+import { withSignupFlag } from "@/lib/signupFlag";
 
 export const DEFAULT_DESTINATION = "/process-library";
 
@@ -25,9 +27,25 @@ export async function postAuthDestination(
   const target = safeNext(next);
 
   // The user explicitly asked to reset their password; that's the whole point
-  // of this round trip, so it jumps the queue.
+  // of this round trip, so it jumps the queue. An existing account by
+  // definition, so there is no signup to report either.
   if (target.startsWith("/reset-password")) return target;
 
+  const destination = await route(supabase, user, target);
+
+  // Tagged here rather than in each caller, so every way in — magic link,
+  // OAuth, emailed code, password — reports a new account the same way, on
+  // whichever page that route happens to land on.
+  return (await claimSignupConversion(user))
+    ? withSignupFlag(destination)
+    : destination;
+}
+
+async function route(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  user: User,
+  target: string
+): Promise<string> {
   if (await needsOnboarding(user)) {
     return `/welcome?next=${encodeURIComponent(target)}`;
   }
